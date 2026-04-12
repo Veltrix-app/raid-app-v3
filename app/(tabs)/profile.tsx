@@ -1,5 +1,5 @@
-import React from "react";
-import { Alert, Image, ImageBackground, StyleSheet, Text, View } from "react-native";
+import React, { useMemo } from "react";
+import { Alert, Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import Screen from "@/components/Screen";
@@ -26,21 +26,30 @@ export default function ProfileScreen() {
     joinedCommunityCount,
     claimCount,
     streakCount,
+    unlockedRewardIds,
+    completedCampaignIds,
+    notificationsFeed,
+    questStatuses,
     resetProgress,
   } = useAppState();
 
   const { profile, signOut, loading: authLoading } = useAuth();
-  const {
-    badges,
-    unlockedBadgeIds,
-    loading: liveLoading,
-    error,
-  } = useLiveAppData();
+  const { badges, unlockedBadgeIds, rewards, loading: liveLoading, error } = useLiveAppData();
 
   const progress = Math.min((currentXp / nextLevelXp) * 100, 100);
-  const unlockedBadges = badges.filter((badge) =>
-    unlockedBadgeIds.includes(badge.id)
+  const unlockedBadges = badges.filter((badge) => unlockedBadgeIds.includes(badge.id));
+  const claimableRewardCount = useMemo(
+    () =>
+      rewards.filter(
+        (reward) => unlockedRewardIds.includes(reward.id) && reward.claimable !== false
+      ).length,
+    [rewards, unlockedRewardIds]
   );
+  const pendingReviewCount = useMemo(
+    () => Object.values(questStatuses).filter((status) => status === "pending").length,
+    [questStatuses]
+  );
+  const recentActivity = useMemo(() => notificationsFeed.slice(0, 3), [notificationsFeed]);
 
   const username = profile?.username || "Raider";
   const avatar =
@@ -59,10 +68,7 @@ export default function ProfileScreen() {
   const questsCompleted = profile?.questsCompleted ?? completedQuestCount;
   const raidsCompleted = profile?.raidsCompleted ?? confirmedRaidCount;
   const rewardsClaimed = profile?.rewardsClaimed ?? claimCount;
-  const walletText =
-    walletConnected
-      ? profile?.wallet || "Wallet connected"
-      : "Wallet not connected";
+  const walletText = walletConnected ? profile?.wallet || "Wallet connected" : "Wallet not connected";
 
   function handleWalletConnect() {
     connectWallet();
@@ -101,34 +107,27 @@ export default function ProfileScreen() {
 
         <ProgressBar progress={progress} />
         <Text style={styles.levelText}>
-          Level {currentLevel} • {currentXp} / {nextLevelXp} XP
+          Level {currentLevel} | {currentXp} / {nextLevelXp} XP
         </Text>
       </View>
 
-      <PrimaryButton
-        title="Edit Profile"
-        onPress={() => router.push("/profile/edit")}
-      />
+      <PrimaryButton title="Edit Profile" onPress={() => router.push("/profile/edit")} />
 
       <View style={styles.reputationCard}>
         <View style={styles.reputationHeader}>
           <View>
             <Text style={styles.reputationEyebrow}>Veltrix Reputation</Text>
-            <Text style={styles.reputationTitle}>
-              {contributionTier.toUpperCase()}
-            </Text>
+            <Text style={styles.reputationTitle}>{contributionTier.toUpperCase()}</Text>
           </View>
 
           <View style={styles.rankPill}>
             <Text style={styles.rankLabel}>Rank</Text>
-            <Text style={styles.rankValue}>
-              {reputationRank > 0 ? `#${reputationRank}` : "-"}
-            </Text>
+            <Text style={styles.rankValue}>{reputationRank > 0 ? `#${reputationRank}` : "-"}</Text>
           </View>
         </View>
 
         <Text style={styles.reputationText}>
-          Trust and quality signals follow your activity across quests, raids and claims. This is the first layer of your portable Veltrix identity.
+          Trust and quality signals follow your activity across quests, raids and claims.
         </Text>
 
         <View style={styles.row}>
@@ -152,6 +151,53 @@ export default function ProfileScreen() {
         <StatCard label="Level" value={String(currentLevel)} />
       </View>
 
+      <View style={styles.progressionCard}>
+        <Text style={styles.progressionEyebrow}>Progression</Text>
+        <Text style={styles.progressionTitle}>Where your account stands now</Text>
+        <Text style={styles.progressionBody}>
+          Keep this loop moving: clear pending reviews, finish more campaigns and turn unlocked rewards into claimed wins.
+        </Text>
+
+        <View style={styles.progressionGrid}>
+          <View style={styles.progressionMetric}>
+            <Text style={styles.progressionMetricValue}>{pendingReviewCount}</Text>
+            <Text style={styles.progressionMetricLabel}>Pending reviews</Text>
+          </View>
+          <View style={styles.progressionMetric}>
+            <Text style={styles.progressionMetricValue}>{claimableRewardCount}</Text>
+            <Text style={styles.progressionMetricLabel}>Claimable rewards</Text>
+          </View>
+          <View style={styles.progressionMetric}>
+            <Text style={styles.progressionMetricValue}>{completedCampaignIds.length}</Text>
+            <Text style={styles.progressionMetricLabel}>Completed campaigns</Text>
+          </View>
+        </View>
+      </View>
+
+      {recentActivity.length > 0 ? (
+        <View style={styles.activityCard}>
+          <View style={styles.activityHeader}>
+            <View>
+              <Text style={styles.activityEyebrow}>Recent activity</Text>
+              <Text style={styles.activityTitle}>Latest account movement</Text>
+            </View>
+            <Pressable onPress={() => router.push("/notifications")}>
+              <Text style={styles.activityCta}>Open feed</Text>
+            </Pressable>
+          </View>
+
+          {recentActivity.map((item) => (
+            <View key={item.id} style={styles.activityItem}>
+              <Text style={styles.activityItemType}>{item.type}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.activityItemTitle}>{item.title}</Text>
+                <Text style={styles.activityItemBody}>{item.body}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <PrimaryButton
         title={walletConnected ? "Wallet Connected" : "Connect Wallet"}
         onPress={handleWalletConnect}
@@ -166,10 +212,7 @@ export default function ProfileScreen() {
         onPress={handleSignOut}
       />
 
-      <SectionTitle
-        title="Unlocked Badges"
-        subtitle="Your visible achievements"
-      />
+      <SectionTitle title="Unlocked Badges" subtitle="Your visible achievements" />
 
       <View style={styles.badgeCard}>
         {unlockedBadges.length > 0 ? (
@@ -203,9 +246,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 6,
   },
-  heroImage: {
-    borderRadius: RADIUS.xl,
-  },
+  heroImage: { borderRadius: RADIUS.xl },
   heroOverlay: {
     flex: 1,
     justifyContent: "flex-end",
@@ -223,15 +264,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     backgroundColor: COLORS.card2,
   },
-  profileTextWrap: {
-    flex: 1,
-    paddingBottom: 6,
-  },
-  name: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "800",
-  },
+  profileTextWrap: { flex: 1, paddingBottom: 6 },
+  name: { color: "#FFFFFF", fontSize: 24, fontWeight: "800" },
   playerTitle: {
     color: COLORS.primary,
     fontSize: 13,
@@ -240,12 +274,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  faction: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 13,
-    marginTop: 6,
-    fontWeight: "600",
-  },
+  faction: { color: "rgba(255,255,255,0.85)", fontSize: 13, marginTop: 6, fontWeight: "600" },
   bioCard: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
@@ -259,16 +288,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 4,
   },
-  bioTitle: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  bioText: {
-    color: COLORS.subtext,
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  bioTitle: { color: COLORS.text, fontSize: 16, fontWeight: "800" },
+  bioText: { color: COLORS.subtext, fontSize: 14, lineHeight: 20 },
   reputationCard: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
@@ -295,17 +316,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-  reputationTitle: {
-    color: COLORS.text,
-    fontSize: 24,
-    fontWeight: "800",
-    marginTop: 6,
-  },
-  reputationText: {
-    color: COLORS.subtext,
-    fontSize: 13,
-    lineHeight: 20,
-  },
+  reputationTitle: { color: COLORS.text, fontSize: 24, fontWeight: "800", marginTop: 6 },
+  reputationText: { color: COLORS.subtext, fontSize: 13, lineHeight: 20 },
   rankPill: {
     borderRadius: RADIUS.md,
     borderWidth: 1,
@@ -322,24 +334,80 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.6,
   },
-  rankValue: {
-    color: COLORS.text,
-    fontSize: 20,
+  rankValue: { color: COLORS.text, fontSize: 20, fontWeight: "800", marginTop: 4 },
+  wallet: { color: COLORS.subtext, fontSize: 12 },
+  levelText: { color: COLORS.subtext, fontSize: 12 },
+  row: { flexDirection: "row", gap: SPACING.md },
+  progressionCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: 10,
+  },
+  progressionEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
     fontWeight: "800",
-    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
   },
-  wallet: {
-    color: COLORS.subtext,
-    fontSize: 12,
+  progressionTitle: { color: COLORS.text, fontSize: 20, fontWeight: "800" },
+  progressionBody: { color: COLORS.subtext, fontSize: 13, lineHeight: 20 },
+  progressionGrid: { flexDirection: "row", gap: SPACING.md, marginTop: 2 },
+  progressionMetric: {
+    flex: 1,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.card2,
+    padding: SPACING.md,
   },
-  levelText: {
-    color: COLORS.subtext,
-    fontSize: 12,
-  },
-  row: {
-    flexDirection: "row",
+  progressionMetricValue: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
+  progressionMetricLabel: { color: COLORS.subtext, fontSize: 12, marginTop: 6, lineHeight: 18 },
+  activityCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
     gap: SPACING.md,
   },
+  activityHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
+  activityEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  activityTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800", marginTop: 4 },
+  activityCta: { color: COLORS.primary, fontSize: 13, fontWeight: "800" },
+  activityItem: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    alignItems: "flex-start",
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.card2,
+    padding: SPACING.md,
+  },
+  activityItemType: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    minWidth: 64,
+  },
+  activityItemTitle: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  activityItemBody: { color: COLORS.subtext, fontSize: 12, marginTop: 4, lineHeight: 18 },
   badgeCard: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
@@ -358,21 +426,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
   },
-  badgeIcon: {
-    fontSize: 24,
-  },
-  badgeName: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  badgeDesc: {
-    color: COLORS.subtext,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  emptyText: {
-    color: COLORS.subtext,
-    fontSize: 13,
-  },
+  badgeIcon: { fontSize: 24 },
+  badgeName: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  badgeDesc: { color: COLORS.subtext, fontSize: 12, marginTop: 4 },
+  emptyText: { color: COLORS.subtext, fontSize: 13 },
 });

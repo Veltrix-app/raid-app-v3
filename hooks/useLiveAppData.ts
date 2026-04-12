@@ -38,6 +38,31 @@ export function useLiveAppData() {
   const canonicalClaimedRewards = userProgress?.claimedRewards ?? [];
   const canonicalUnlockedRewardIds = userProgress?.unlockedRewardIds ?? [];
 
+  const enrichedCommunities = communities.map((community) => {
+    const campaignCount = campaigns.filter(
+      (campaign) => campaign.communityId === community.id
+    ).length;
+    const rewardCount = rewards.filter((reward) =>
+      campaigns.some(
+        (campaign) => campaign.id === reward.campaignId && campaign.communityId === community.id
+      )
+    ).length;
+
+    const rewardPool =
+      rewardCount > 0
+        ? `${rewardCount} reward${rewardCount === 1 ? "" : "s"} live`
+        : campaignCount > 0
+        ? `${campaignCount} campaign${campaignCount === 1 ? "" : "s"} live`
+        : "Live project";
+
+    return {
+      ...community,
+      rewardPool,
+      campaignCount,
+      rewardCount,
+    };
+  });
+
   const derivedCampaignProgressMap = campaigns.reduce<Record<string, number>>((acc, campaign) => {
     const campaignQuests = quests.filter((quest) => quest.campaignId === campaign.id);
     const campaignRaids = raids.filter((raid) => raid.campaignId === campaign.id);
@@ -70,7 +95,7 @@ export function useLiveAppData() {
   );
 
   const campaignDiscovery = buildCampaignDiscovery({
-    communities,
+    communities: enrichedCommunities,
     campaigns,
     quests,
     rewards,
@@ -82,7 +107,7 @@ export function useLiveAppData() {
   });
 
   const communityDiscovery = buildCommunityDiscovery({
-    communities,
+    communities: enrichedCommunities,
     campaigns,
     quests,
     rewards,
@@ -96,7 +121,7 @@ export function useLiveAppData() {
   return {
     leaderboard,
     raids,
-    communities,
+    communities: enrichedCommunities,
     campaigns,
     rewards,
     quests,

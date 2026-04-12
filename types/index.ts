@@ -5,6 +5,8 @@ export type Community = {
   description: string;
   longDescription?: string;
   rewardPool: string;
+  campaignCount?: number;
+  rewardCount?: number;
   logo?: string;
   bannerUrl?: string;
   chain?: string;

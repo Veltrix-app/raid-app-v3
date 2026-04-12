@@ -51,6 +51,10 @@ type ProjectLookupRow = {
   name: string;
 };
 
+function toStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -184,6 +188,116 @@ function validateProofInput(params: {
   }
 
   return null;
+}
+
+function getVerificationRoute(decision: VerificationDecision) {
+  const metadataRoute =
+    typeof decision.metadata?.automationRoute === "string"
+      ? decision.metadata.automationRoute
+      : null;
+
+  if (metadataRoute) {
+    return metadataRoute;
+  }
+
+  if (decision.flagType === "high_risk_submission") {
+    return "risk_review";
+  }
+
+  if (decision.flagType === "verification_config_incomplete") {
+    return "config_review";
+  }
+
+  if (decision.flagType === "missing_proof" || decision.flagType === "invalid_proof_format") {
+    return "validation_failed";
+  }
+
+  if (decision.status === "approved") {
+    return "rule_auto_approved";
+  }
+
+  if (decision.status === "rejected") {
+    return "validation_failed";
+  }
+
+  return "manual_review";
+}
+
+function getVerificationConfidence(params: {
+  decision: VerificationDecision;
+  duplicateSignals: DuplicateSignal[];
+}) {
+  const { decision, duplicateSignals } = params;
+
+  if (duplicateSignals.length > 0) {
+    return 28;
+  }
+
+  if (decision.flagType === "verification_config_incomplete") {
+    return 35;
+  }
+
+  if (decision.flagType === "high_risk_submission") {
+    return 42;
+  }
+
+  if (decision.status === "approved") {
+    return 92;
+  }
+
+  if (decision.status === "rejected") {
+    return 88;
+  }
+
+  return 55;
+}
+
+async function persistVerificationResult(params: {
+  authUserId: string;
+  submissionId: string;
+  quest: VerificationQuestRow;
+  decision: VerificationDecision;
+  duplicateSignals: DuplicateSignal[];
+  proofText: string;
+}) {
+  const { authUserId, submissionId, quest, decision, duplicateSignals, proofText } = params;
+  const route = getVerificationRoute(decision);
+  const requiredConfigKeys = toStringArray(decision.metadata?.requiredConfigKeys);
+  const missingConfigKeys = toStringArray(decision.metadata?.missingConfigKeys);
+  const duplicateSignalTypes = duplicateSignals.map((signal) => signal.flagType);
+  const confidenceScore = getVerificationConfidence({ decision, duplicateSignals });
+
+  const { error } = await supabase.from("verification_results").insert({
+    auth_user_id: authUserId,
+    project_id: quest.project_id ?? null,
+    quest_id: quest.id,
+    source_table: "quest_submissions",
+    source_id: submissionId,
+    verification_type: quest.verification_type ?? "manual_review",
+    route,
+    decision_status: decision.status,
+    decision_reason: decision.reason,
+    confidence_score: confidenceScore,
+    required_config_keys: requiredConfigKeys,
+    missing_config_keys: missingConfigKeys,
+    duplicate_signal_types: duplicateSignalTypes,
+    metadata: {
+      questTitle: quest.title,
+      questType: quest.quest_type ?? "custom",
+      proofPreview: proofText.trim().slice(0, 140),
+      proofType: quest.proof_type ?? "none",
+      duplicateSignals: duplicateSignals.map((signal) => ({
+        flagType: signal.flagType,
+        severity: signal.severity,
+        reason: signal.reason,
+      })),
+      decisionMetadata: decision.metadata ?? {},
+    },
+  });
+
+  if (error) {
+    console.error("Verification result persistence failed:", error.message);
+  }
 }
 
 function evaluateSubmission(params: {
@@ -773,6 +887,15 @@ export function useActionSync() {
                 console.error("Review flag creation failed:", flagError.message);
               }
             }
+
+            await persistVerificationResult({
+              authUserId: currentAuthUserId,
+              submissionId: insertedSubmission.id,
+              quest,
+              decision: finalDecision,
+              duplicateSignals,
+              proofText: questProofs[questId] ?? "",
+            });
           }
 
           if (finalDecision.status !== "pending") {

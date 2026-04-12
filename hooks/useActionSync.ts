@@ -23,6 +23,13 @@ type VerificationDecision = {
   metadata?: Record<string, unknown>;
 };
 
+type DuplicateSignal = {
+  flagType: string;
+  severity: "low" | "medium" | "high";
+  reason: string;
+  metadata: Record<string, unknown>;
+};
+
 function evaluateSubmission(params: {
   quest: VerificationQuestRow;
   proofText: string;
@@ -124,6 +131,80 @@ function evaluateSubmission(params: {
   } satisfies VerificationDecision;
 }
 
+async function detectDuplicateSignals(params: {
+  authUserId: string;
+  questId: string;
+  projectId: string | null;
+  proofText: string;
+  walletAddress: string;
+}) {
+  const { authUserId, questId, projectId, proofText, walletAddress } = params;
+  const duplicateSignals: DuplicateSignal[] = [];
+  const trimmedProof = proofText.trim();
+
+  const proofCheck = trimmedProof
+    ? supabase
+        .from("quest_submissions")
+        .select("id, auth_user_id, quest_id, created_at")
+        .eq("quest_id", questId)
+        .eq("proof_text", trimmedProof)
+        .neq("auth_user_id", authUserId)
+        .limit(5)
+    : Promise.resolve({ data: [], error: null });
+
+  const walletCheck = walletAddress
+    ? supabase
+        .from("wallet_links")
+        .select("auth_user_id, wallet_address")
+        .eq("wallet_address", walletAddress)
+        .neq("auth_user_id", authUserId)
+        .limit(5)
+    : Promise.resolve({ data: [], error: null });
+
+  const [
+    { data: duplicateProofRows, error: duplicateProofError },
+    { data: duplicateWalletRows, error: duplicateWalletError },
+  ] = await Promise.all([proofCheck, walletCheck]);
+
+  if (duplicateProofError) {
+    console.error("Duplicate proof check failed:", duplicateProofError.message);
+  }
+
+  if (duplicateWalletError) {
+    console.error("Duplicate wallet check failed:", duplicateWalletError.message);
+  }
+
+  if ((duplicateProofRows ?? []).length > 0) {
+    const proofRows = duplicateProofRows ?? [];
+    duplicateSignals.push({
+      flagType: "duplicate_proof",
+      severity: "high",
+      reason: "This proof text already appeared on another submission for the same quest.",
+      metadata: {
+        questId,
+        projectId,
+        duplicateCount: proofRows.length,
+        proofPreview: trimmedProof.slice(0, 140),
+      },
+    });
+  }
+
+  if ((duplicateWalletRows ?? []).length > 0) {
+    const walletRows = duplicateWalletRows ?? [];
+    duplicateSignals.push({
+      flagType: "duplicate_wallet",
+      severity: "high",
+      reason: "This wallet is already linked to another account.",
+      metadata: {
+        walletAddress,
+        duplicateCount: walletRows.length,
+      },
+    });
+  }
+
+  return duplicateSignals;
+}
+
 export function useActionSync() {
   const { authUserId, session } = useAuth();
   const profile = useAuthStore((s) => s.profile);
@@ -195,6 +276,8 @@ export function useActionSync() {
     if (!session || !authUserId) return;
 
     async function syncQuestSubmissions() {
+      const currentAuthUserId = authUserId;
+      if (!currentAuthUserId) return;
       const pendingQuestIds = Object.entries(questStatuses)
         .filter(([, status]) => status === "pending")
         .map(([questId]) => questId);
@@ -212,7 +295,7 @@ export function useActionSync() {
           supabase
             .from("wallet_links")
             .select("id", { count: "exact", head: true })
-            .eq("auth_user_id", authUserId),
+            .eq("auth_user_id", currentAuthUserId),
         ]);
 
       if (questError) {
@@ -227,7 +310,8 @@ export function useActionSync() {
       const questsById = new Map(
         ((questRows ?? []) as VerificationQuestRow[]).map((row) => [row.id, row])
       );
-      const hasWalletSignal = Boolean(profile?.wallet) || (walletLinkCount ?? 0) > 0;
+      const walletAddress = profile?.wallet?.trim() ?? "";
+      const hasWalletSignal = Boolean(walletAddress) || (walletLinkCount ?? 0) > 0;
 
       for (const questId of pendingQuestIds) {
         if (syncedPendingQuestsRef.current.has(questId)) continue;
@@ -243,13 +327,30 @@ export function useActionSync() {
           trustScore: profile?.trustScore ?? 50,
           sybilScore: profile?.sybilScore ?? 0,
         });
+        const duplicateSignals = await detectDuplicateSignals({
+          authUserId: currentAuthUserId,
+          questId,
+          projectId: quest.project_id ?? "",
+          proofText: questProofs[questId] ?? "",
+          walletAddress,
+        });
+        const duplicateReviewNeeded = duplicateSignals.length > 0;
+        const finalDecision =
+          duplicateReviewNeeded && decision.status === "approved"
+            ? {
+                ...decision,
+                status: "pending" as const,
+                reason:
+                  "Submission routed to review because duplicate identity or proof signals were detected.",
+              }
+            : decision;
 
         const { data: insertedSubmission, error } = await supabase
           .from("quest_submissions")
           .insert({
-          auth_user_id: authUserId,
+          auth_user_id: currentAuthUserId,
           quest_id: questId,
-          status: decision.status,
+          status: finalDecision.status,
           proof_text: questProofs[questId] ?? "",
           })
           .select("id")
@@ -258,30 +359,57 @@ export function useActionSync() {
         if (!error) {
           syncedPendingQuestsRef.current.add(questId);
 
-          if (decision.flagType && insertedSubmission?.id) {
-            const { error: flagError } = await supabase.from("review_flags").insert({
-              auth_user_id: authUserId,
-              project_id: quest.project_id,
-              source_table: "quest_submissions",
-              source_id: insertedSubmission.id,
-              flag_type: decision.flagType,
-              severity: decision.severity ?? "medium",
-              status: "open",
-              reason: decision.reason,
-              metadata: {
-                questId,
-                questTitle: quest.title,
-                ...decision.metadata,
-              },
-            });
+          if (insertedSubmission?.id) {
+            const flagsToInsert = [
+              ...(finalDecision.flagType
+                ? [
+                      {
+                      auth_user_id: currentAuthUserId,
+                      project_id: quest.project_id ?? null,
+                      source_table: "quest_submissions",
+                      source_id: insertedSubmission.id,
+                      flag_type: finalDecision.flagType,
+                      severity: finalDecision.severity ?? "medium",
+                      status: "open",
+                      reason: finalDecision.reason,
+                      metadata: {
+                        questId,
+                        questTitle: quest.title,
+                        ...finalDecision.metadata,
+                      },
+                    },
+                  ]
+                : []),
+                ...duplicateSignals.map((signal) => ({
+                auth_user_id: currentAuthUserId,
+                project_id: quest.project_id ?? null,
+                source_table: "quest_submissions",
+                source_id: insertedSubmission.id,
+                flag_type: signal.flagType,
+                severity: signal.severity,
+                status: "open",
+                reason: signal.reason,
+                metadata: {
+                  questId,
+                  questTitle: quest.title,
+                  ...signal.metadata,
+                },
+              })),
+            ];
 
-            if (flagError) {
-              console.error("Review flag creation failed:", flagError.message);
+            if (flagsToInsert.length > 0) {
+              const { error: flagError } = await supabase
+                .from("review_flags")
+                .insert(flagsToInsert);
+
+              if (flagError) {
+                console.error("Review flag creation failed:", flagError.message);
+              }
             }
           }
 
-          if (decision.status !== "pending") {
-            setQuestReviewOutcome(questId, decision.status);
+          if (finalDecision.status !== "pending") {
+            setQuestReviewOutcome(questId, finalDecision.status);
           }
         } else {
           console.error("Quest submission sync failed:", error.message);

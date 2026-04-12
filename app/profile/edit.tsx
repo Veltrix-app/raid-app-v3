@@ -89,6 +89,9 @@ export default function EditProfileScreen() {
           placeholderTextColor={COLORS.subtext}
           style={styles.input}
         />
+        <Text style={styles.helperText}>
+          Your wallet will be used for project verification, reward eligibility and future trust signals inside Veltrix.
+        </Text>
 
         <TextInput
           value={avatarUrl}
@@ -137,6 +140,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  helperText: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -4,
   },
   textarea: {
     minHeight: 100,

@@ -30,7 +30,7 @@ export default function AuthGate({ children }: Props) {
 const styles = StyleSheet.create({
   center: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bg,
     justifyContent: "center",
     alignItems: "center",
     gap: 12,

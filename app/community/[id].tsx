@@ -33,18 +33,18 @@ export default function CommunityDetailScreen() {
     );
   }
 
-  const joined = joinedCommunityIds.includes(community.id);
-
-  function handleJoin() {
-    joinCommunity(community.id);
-    Alert.alert(joined ? "Community left" : "Community joined");
-  }
-
+  const currentCommunity = community;
+  const joined = joinedCommunityIds.includes(currentCommunity.id);
   const communityLeaders = leaderboard.map((item, index) => ({
     ...item,
     rank: index + 1,
     title: `Level ${item.level}`,
   }));
+
+  function handleJoin() {
+    joinCommunity(currentCommunity.id);
+    Alert.alert(joined ? "Community left" : "Community joined");
+  }
 
   return (
     <>
@@ -61,14 +61,14 @@ export default function CommunityDetailScreen() {
         <LiveScreenState loading={loading} error={error} />
 
         <View style={styles.hero}>
-          <Text style={styles.name}>{community.name}</Text>
-          <Text style={styles.meta}>{community.members.toLocaleString()} members</Text>
-          <Text style={styles.desc}>{community.description}</Text>
+          <Text style={styles.name}>{currentCommunity.name}</Text>
+          <Text style={styles.meta}>{currentCommunity.members.toLocaleString()} members</Text>
+          <Text style={styles.desc}>{currentCommunity.description}</Text>
 
           <View style={styles.stats}>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Reward pool</Text>
-              <Text style={styles.statValue}>{community.rewardPool}</Text>
+              <Text style={styles.statValue}>{currentCommunity.rewardPool}</Text>
             </View>
 
             <View style={styles.stat}>

@@ -34,7 +34,8 @@ export default function RaidDetailScreen() {
     );
   }
 
-  const alreadyConfirmed = confirmedRaidIds.includes(raid.id);
+  const currentRaid = raid;
+  const alreadyConfirmed = confirmedRaidIds.includes(currentRaid.id);
 
   function handleConfirm() {
     if (alreadyConfirmed) {
@@ -42,7 +43,7 @@ export default function RaidDetailScreen() {
       return;
     }
 
-    confirmRaid(raid.id);
+    confirmRaid(currentRaid.id);
     setShowXP(true);
     Alert.alert("Raid confirmed", "Your raid has been confirmed.");
   }
@@ -62,14 +63,14 @@ export default function RaidDetailScreen() {
         <LiveScreenState loading={loading} error={error} />
 
         <ImageBackground
-          source={{ uri: raid.banner }}
+          source={{ uri: currentRaid.banner }}
           style={styles.hero}
           imageStyle={styles.heroImage}
         >
           <View style={styles.heroOverlay}>
-            <Text style={styles.community}>{raid.community}</Text>
-            <Text style={styles.title}>{raid.title}</Text>
-            <Text style={styles.target}>{raid.target}</Text>
+            <Text style={styles.community}>{currentRaid.community}</Text>
+            <Text style={styles.title}>{currentRaid.title}</Text>
+            <Text style={styles.target}>{currentRaid.target}</Text>
           </View>
         </ImageBackground>
 
@@ -77,17 +78,17 @@ export default function RaidDetailScreen() {
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Reward</Text>
-              <Text style={styles.statValue}>+{raid.reward} XP</Text>
+              <Text style={styles.statValue}>+{currentRaid.reward} XP</Text>
             </View>
 
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Timer</Text>
-              <Text style={styles.statValue}>{raid.timer}</Text>
+              <Text style={styles.statValue}>{currentRaid.timer}</Text>
             </View>
           </View>
 
-          <ProgressBar progress={raid.progress} />
-          <Text style={styles.progressLabel}>{raid.progress}% campaign push progress</Text>
+          <ProgressBar progress={currentRaid.progress} />
+          <Text style={styles.progressLabel}>{currentRaid.progress}% campaign push progress</Text>
         </View>
 
         <SectionTitle
@@ -96,8 +97,8 @@ export default function RaidDetailScreen() {
         />
 
         <View style={styles.instructionsCard}>
-          {raid.instructions.map((step, index) => (
-            <View key={`${raid.id}-${index}`} style={styles.stepRow}>
+          {currentRaid.instructions.map((step, index) => (
+            <View key={`${currentRaid.id}-${index}`} style={styles.stepRow}>
               <View style={styles.stepDot}>
                 <Text style={styles.stepDotText}>{index + 1}</Text>
               </View>

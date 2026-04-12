@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { quests, raids, rewards, userProfile } from "../data/mock";
+import { defaultUserProfile, quests, raids, rewards } from "../data/mock";
 
 type QuestStatus = "open" | "pending" | "approved" | "rejected";
 
@@ -115,7 +115,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [state, loaded]);
 
   const currentXp = useMemo(() => {
-    const baseXp = userProfile.xp;
+    const baseXp = defaultUserProfile.xp;
 
     const approvedQuestXp = quests
       .filter((q) => state.questStatuses[q.id] === "approved" && q.status !== "approved")

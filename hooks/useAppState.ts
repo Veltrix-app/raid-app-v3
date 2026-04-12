@@ -10,6 +10,7 @@ export function useAppState() {
   const claimedRewardIds = useAppStore((s) => s.claimedRewards);
   const openedLootboxIds = useAppStore((s) => s.openedLootboxIds);
   const questStatuses = useAppStore((s) => s.questStatuses);
+  const questProofs = useAppStore((s) => s.questProofs);
 
   const unreadNotificationCount = useAppStore((s) => s.unreadCount);
   const notificationsFeed = useAppStore((s) => s.notificationsFeed);
@@ -50,6 +51,7 @@ export function useAppState() {
     claimedRewardIds,
     openedLootboxIds,
     questStatuses,
+    questProofs,
 
     unreadNotificationCount,
     notificationsFeed,

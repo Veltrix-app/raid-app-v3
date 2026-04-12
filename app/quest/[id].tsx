@@ -6,10 +6,11 @@ import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import PrimaryButton from "@/components/PrimaryButton";
 import XPGainToast from "@/components/XPGainToast";
+import LiveScreenState from "@/components/LiveScreenState";
 
-import { getQuestById } from "@/data/mock";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
 
 function getStatusLabel(status: string) {
   if (status === "approved") return "Approved";
@@ -21,21 +22,28 @@ function getStatusLabel(status: string) {
 export default function QuestDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { submitQuest, approveQuestPrototype, questStatuses } = useAppState();
+  const { quests, loading, error } = useLiveAppData();
 
   const [proof, setProof] = useState("");
   const [showXP, setShowXP] = useState(false);
 
-  const quest = useMemo(() => getQuestById(id || ""), [id]);
+  const quest = useMemo(
+    () => quests.find((item) => item.id === (id || "")),
+    [quests, id]
+  );
 
   if (!quest) {
     return (
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
         <Text style={styles.notFound}>Quest not found.</Text>
       </Screen>
     );
   }
 
-  const liveStatus = questStatuses[quest.id] || quest.status;
+  const currentQuest = quest;
+
+  const liveStatus = questStatuses[currentQuest.id] || currentQuest.status;
 
   function handleSubmit() {
     if (liveStatus === "approved") {
@@ -43,12 +51,12 @@ export default function QuestDetailScreen() {
       return;
     }
 
-    if (!proof.trim() && quest.type === "Proof") {
+    if (!proof.trim() && currentQuest.type === "Proof") {
       Alert.alert("Proof required", "Please paste proof before submitting.");
       return;
     }
 
-    submitQuest(quest.id);
+    submitQuest(currentQuest.id, proof.trim());
     Alert.alert("Submitted", "Your quest proof has been submitted.");
   }
 
@@ -58,7 +66,7 @@ export default function QuestDetailScreen() {
       return;
     }
 
-    approveQuestPrototype(quest.id);
+    approveQuestPrototype(currentQuest.id);
     setShowXP(true);
     Alert.alert("Approved", "Prototype approval complete.");
   }
@@ -75,19 +83,21 @@ export default function QuestDetailScreen() {
       />
 
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
+
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>Quest</Text>
-          <Text style={styles.heroTitle}>{quest.title}</Text>
-          <Text style={styles.heroDescription}>{quest.description}</Text>
+          <Text style={styles.heroTitle}>{currentQuest.title}</Text>
+          <Text style={styles.heroDescription}>{currentQuest.description}</Text>
 
           <View style={styles.metaRow}>
             <View style={styles.metaCard}>
               <Text style={styles.metaLabel}>Type</Text>
-              <Text style={styles.metaValue}>{quest.type}</Text>
+              <Text style={styles.metaValue}>{currentQuest.type}</Text>
             </View>
             <View style={styles.metaCard}>
               <Text style={styles.metaLabel}>Reward</Text>
-              <Text style={styles.metaValue}>+{quest.xp} XP</Text>
+              <Text style={styles.metaValue}>+{currentQuest.xp} XP</Text>
             </View>
           </View>
         </View>
@@ -99,7 +109,7 @@ export default function QuestDetailScreen() {
         <View style={styles.statusCard}>
           <Text style={styles.statusLabel}>{getStatusLabel(liveStatus)}</Text>
           <Text style={styles.statusSub}>
-            Action: {quest.actionLabel || "Open Task"}
+            Action: {currentQuest.actionLabel || "Open Task"}
           </Text>
         </View>
 
@@ -131,7 +141,7 @@ export default function QuestDetailScreen() {
           disabled={liveStatus === "approved"}
         />
 
-        {showXP && <XPGainToast amount={quest.xp} onDone={() => setShowXP(false)} />}
+        {showXP && <XPGainToast amount={currentQuest.xp} onDone={() => setShowXP(false)} />}
       </Screen>
     </>
   );

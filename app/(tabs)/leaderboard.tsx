@@ -6,6 +6,15 @@ import LeaderboardRow from "@/components/LeaderboardRow";
 import LiveScreenState from "@/components/LiveScreenState";
 import { useLiveAppData } from "@/hooks/useLiveAppData";
 
+type LeaderboardUser = {
+  id: string;
+  username: string;
+  xp: number;
+  level: number;
+  banner?: string;
+  isCurrentUser?: boolean;
+};
+
 export default function LeaderboardScreen() {
   const { leaderboard, loading, error } = useLiveAppData();
 
@@ -25,14 +34,14 @@ export default function LeaderboardScreen() {
       ) : null}
 
       <ScrollView contentContainerStyle={styles.content}>
-        {leaderboard.map((item, index) => (
+        {leaderboard.map((item: LeaderboardUser, index: number) => (
           <LeaderboardRow
             key={item.id}
             rank={index + 1}
             username={item.username}
             xp={item.xp}
             isCurrentUser={!!item.isCurrentUser}
-            title={Level ${item.level}}
+            title={`Level ${item.level}`}
             banner={item.banner}
           />
         ))}

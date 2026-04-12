@@ -7,10 +7,12 @@ import SectionTitle from "@/components/SectionTitle";
 import StatCard from "@/components/StatCard";
 import ProgressBar from "@/components/ProgressBar";
 import PrimaryButton from "@/components/PrimaryButton";
+import LiveScreenState from "@/components/LiveScreenState";
 
-import { badgesCatalog } from "@/data/mock";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
+import { useAuth } from "@/hooks/useAuth";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
 
 export default function ProfileScreen() {
   const {
@@ -23,67 +25,72 @@ export default function ProfileScreen() {
     confirmedRaidCount,
     joinedCommunityCount,
     claimCount,
-    signOut,
-    profile,
-    unlockedBadgeIds,
     streakCount,
     resetProgress,
   } = useAppState();
 
+  const { profile, signOut, loading: authLoading } = useAuth();
+  const {
+    badges,
+    unlockedBadgeIds,
+    loading: liveLoading,
+    error,
+  } = useLiveAppData();
+
   const progress = Math.min((currentXp / nextLevelXp) * 100, 100);
-  const unlockedBadges = badgesCatalog.filter((badge) =>
+  const unlockedBadges = badges.filter((badge) =>
     unlockedBadgeIds.includes(badge.id)
   );
+
+  const username = profile?.username || "Raider";
+  const avatar =
+    profile?.avatarUrl ||
+    "https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=300&q=80";
+  const banner =
+    profile?.bannerUrl ||
+    "https://images.unsplash.com/photo-1639322537228-f710d846310a?auto=format&fit=crop&w=1400&q=80";
+  const title = profile?.title || "Elite Raider";
+  const faction = profile?.faction || "Neon Wolves";
+  const bio = profile?.bio || "No bio set yet.";
+  const walletText =
+    walletConnected
+      ? profile?.wallet || "Wallet connected"
+      : "Wallet not connected";
 
   function handleWalletConnect() {
     connectWallet();
     Alert.alert("Wallet connected", "Wallet placeholder connected in this prototype.");
   }
 
-  function handleSignOut() {
-    signOut();
+  async function handleSignOut() {
+    await signOut();
   }
 
   return (
     <Screen>
+      <LiveScreenState loading={liveLoading} error={error} />
+
       <ImageBackground
-        source={{
-          uri:
-            profile?.banner ||
-            "https://images.unsplash.com/photo-1639322537228-f710d846310a?auto=format&fit=crop&w=1400&q=80",
-        }}
+        source={{ uri: banner }}
         style={styles.hero}
         imageStyle={styles.heroImage}
       >
         <View style={styles.heroOverlay}>
-          <Image
-            source={{
-              uri:
-                profile?.avatar ||
-                "https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=300&q=80",
-            }}
-            style={styles.avatar}
-          />
+          <Image source={{ uri: avatar }} style={styles.avatar} />
 
           <View style={styles.profileTextWrap}>
-            <Text style={styles.name}>{profile?.username || "Raider"}</Text>
-            <Text style={styles.playerTitle}>{profile?.title || "Elite Raider"}</Text>
-            <Text style={styles.faction}>{profile?.faction || "Neon Wolves"}</Text>
+            <Text style={styles.name}>{username}</Text>
+            <Text style={styles.playerTitle}>{title}</Text>
+            <Text style={styles.faction}>{faction}</Text>
           </View>
         </View>
       </ImageBackground>
 
       <View style={styles.bioCard}>
         <Text style={styles.bioTitle}>Profile Bio</Text>
-        <Text style={styles.bioText}>
-          {profile?.bio || "No bio set yet."}
-        </Text>
+        <Text style={styles.bioText}>{bio}</Text>
 
-        <Text style={styles.wallet}>
-          {walletConnected
-            ? profile?.wallet || "Wallet connected"
-            : "Wallet not connected"}
-        </Text>
+        <Text style={styles.wallet}>{walletText}</Text>
 
         <ProgressBar progress={progress} />
         <Text style={styles.levelText}>
@@ -91,7 +98,10 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      <PrimaryButton title="Edit Profile" onPress={() => router.push("/profile/edit")} />
+      <PrimaryButton
+        title="Edit Profile"
+        onPress={() => router.push("/profile/edit")}
+      />
 
       <View style={styles.row}>
         <StatCard label="Approved quests" value={String(completedQuestCount)} />
@@ -116,9 +126,16 @@ export default function ProfileScreen() {
 
       <PrimaryButton title="Reset Progress (DEV)" onPress={resetProgress} />
 
-      <PrimaryButton title="Sign Out" variant="secondary" onPress={handleSignOut} />
+      <PrimaryButton
+        title={authLoading ? "Signing Out..." : "Sign Out"}
+        variant="secondary"
+        onPress={handleSignOut}
+      />
 
-      <SectionTitle title="Unlocked Badges" subtitle="Your visible achievements" />
+      <SectionTitle
+        title="Unlocked Badges"
+        subtitle="Your visible achievements"
+      />
 
       <View style={styles.badgeCard}>
         {unlockedBadges.length > 0 ? (

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { StyleSheet, Text, View, Pressable } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -7,51 +7,45 @@ import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
 import ProgressBar from "@/components/ProgressBar";
 import RaidCard from "@/components/RaidCard";
-import RewardCard from "@/components/RewardCard";
 import LeaderboardRow from "@/components/LeaderboardRow";
 import PrimaryButton from "@/components/PrimaryButton";
 import CampaignCompleteToast from "@/components/CampaignCompleteToast";
-
-import {
-  getCampaignById,
-  getCampaignRaids,
-  getCampaignRewards,
-  getQuestsByCampaign,
-  leaderboardBase,
-} from "@/data/mock";
-import { useAppState } from "@/hooks/useAppState";
-import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import QuestCard from "@/components/QuestCard";
+import LiveScreenState from "@/components/LiveScreenState";
+
+import { useAppState } from "@/hooks/useAppState";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
+import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 
 export default function CampaignDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const {
-    currentXp,
-    profile,
-    getCampaignProgress,
-    isCampaignCompleted,
-    streakCount,
-  } = useAppState();
+  const { currentXp, profile, getCampaignProgress, isCampaignCompleted, streakCount } =
+    useAppState();
+  const { campaigns, quests, raids, rewards, leaderboard, loading, error } =
+    useLiveAppData();
 
   const [showCompleted, setShowCompleted] = useState(false);
   const prevCompletedRef = useRef(false);
 
-  const campaign = getCampaignById(id || "");
+  const campaign = campaigns.find((item) => item.id === (id || ""));
 
-  if (!campaign) {
-    return (
-      <Screen>
-        <Text style={styles.notFound}>Campaign not found.</Text>
-      </Screen>
-    );
-  }
+  const campaignQuests = useMemo(
+    () => quests.filter((quest) => quest.campaignId === (id || "")),
+    [quests, id]
+  );
 
-  const campaignQuests = getQuestsByCampaign(campaign.id);
-  const campaignRaids = getCampaignRaids(campaign.id);
-  const campaignRewards = getCampaignRewards(campaign.id);
+  const campaignRaids = useMemo(
+    () => raids.filter((raid) => raid.campaignId === (id || "")),
+    [raids, id]
+  );
 
-  const liveProgress = getCampaignProgress(campaign.id);
-  const completed = isCampaignCompleted(campaign.id);
+  const campaignRewards = useMemo(() => {
+    const linked = rewards.filter((reward) => reward.campaignId === (id || ""));
+    return linked.length > 0 ? linked : rewards.slice(0, 3);
+  }, [rewards, id]);
+
+  const liveProgress = getCampaignProgress(id || "");
+  const completed = isCampaignCompleted(id || "");
 
   useEffect(() => {
     if (completed && !prevCompletedRef.current) {
@@ -60,25 +54,22 @@ export default function CampaignDetailScreen() {
     prevCompletedRef.current = completed;
   }, [completed]);
 
-  const leaderboard = useMemo(() => {
-    return [
-      ...leaderboardBase.slice(0, 3),
-      {
-        id: "me",
-        username: profile?.username || "You",
-        xp: currentXp,
-        title: profile?.title || "Elite Raider",
-        banner: profile?.banner,
-        streakCount,
-      },
-    ]
-      .sort((a, b) => b.xp - a.xp)
-      .map((item, index) => ({
-        ...item,
-        rank: index + 1,
-        isCurrentUser: item.id === "me",
-      }));
-  }, [currentXp, profile, streakCount]);
+  const campaignLeaderboard = useMemo(() => {
+    return leaderboard.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      title: `Level ${item.level}`,
+    }));
+  }, [leaderboard]);
+
+  if (!campaign) {
+    return (
+      <Screen>
+        <LiveScreenState loading={loading} error={error} />
+        <Text style={styles.notFound}>Campaign not found.</Text>
+      </Screen>
+    );
+  }
 
   return (
     <>
@@ -92,6 +83,8 @@ export default function CampaignDetailScreen() {
       />
 
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
+
         <LinearGradient
           colors={["#0B0D12", "#18210F", "#13261D"]}
           start={{ x: 0, y: 0 }}
@@ -150,17 +143,26 @@ export default function CampaignDetailScreen() {
 
         <SectionTitle
           title="Campaign Rewards"
-          subtitle="Rewards unlock automatically when the campaign is completed"
+          subtitle="Rewards linked to this campaign"
         />
         {campaignRewards.map((reward) => (
-          <RewardCard key={reward.id} item={reward} />
+          <View key={reward.id} style={styles.rewardCard}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.rewardTitle}>{reward.title}</Text>
+              <Text style={styles.rewardCost}>{reward.cost} XP</Text>
+            </View>
+            <Text style={styles.rewardMeta}>
+              {reward.type} • {reward.rarity || "common"}
+            </Text>
+            <Text style={styles.rewardDescription}>{reward.description}</Text>
+          </View>
         ))}
 
         <SectionTitle
           title="Top Raiders"
           subtitle="Current leaderboard inside this campaign"
         />
-        {leaderboard.map((item) => (
+        {campaignLeaderboard.map((item) => (
           <LeaderboardRow
             key={item.id}
             rank={item.rank}
@@ -268,6 +270,40 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontSize: 12,
     fontWeight: "800",
+  },
+  rewardCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 8,
+  },
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: SPACING.md,
+  },
+  rewardTitle: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "800",
+    flex: 1,
+  },
+  rewardCost: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  rewardMeta: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    textTransform: "capitalize",
+  },
+  rewardDescription: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 18,
   },
   linkButton: {
     marginTop: SPACING.sm,

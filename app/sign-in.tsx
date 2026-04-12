@@ -1,85 +1,171 @@
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import Screen from "@/components/Screen";
-import PrimaryButton from "@/components/PrimaryButton";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
-import { useAppState } from "@/hooks/useAppState";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function SignInScreen() {
-  const { signIn } = useAppState();
+  const { signIn, signUp, loading, error, clearError } = useAuth();
 
-  function handleSignIn() {
-    signIn();
-    router.replace("/(tabs)");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+
+  async function handleSubmit() {
+    clearError();
+
+    if (mode === "signin") {
+      const result = await signIn(email, password);
+      if (result.ok) {
+        router.replace("/(tabs)");
+      }
+      return;
+    }
+
+    const result = await signUp(email, password, username);
+    if (result.ok) {
+      router.replace("/(tabs)");
+    }
   }
 
   return (
     <Screen>
-      <LinearGradient colors={["#6D5EF7", "#3B2E7E"]} style={styles.hero}>
-        <Text style={styles.kicker}>Crypto Community Growth</Text>
-        <Text style={styles.title}>Join missions. Earn rewards. Grow communities.</Text>
-        <Text style={styles.subtitle}>
-          A mobile-first raid and quest app for crypto communities.
-        </Text>
-      </LinearGradient>
-
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sign in to continue</Text>
-        <Text style={styles.cardText}>
-          For this prototype, the buttons below simulate sign-in and onboarding.
-        </Text>
+        <Text style={styles.eyebrow}>Veltrix Access</Text>
+        <Text style={styles.title}>Sign in to Raid App</Text>
 
-        <PrimaryButton title="Continue with Google" onPress={handleSignIn} />
-        <PrimaryButton title="Continue with X" variant="secondary" onPress={handleSignIn} />
-        <PrimaryButton title="Connect Wallet" variant="secondary" onPress={handleSignIn} />
+        <View style={styles.switchRow}>
+          <Pressable
+            onPress={() => setMode("signin")}
+            style={[styles.switchBtn, mode === "signin" && styles.switchActive]}
+          >
+            <Text style={[styles.switchText, mode === "signin" && styles.switchTextActive]}>
+              Sign In
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setMode("signup")}
+            style={[styles.switchBtn, mode === "signup" && styles.switchActive]}
+          >
+            <Text style={[styles.switchText, mode === "signup" && styles.switchTextActive]}>
+              Sign Up
+            </Text>
+          </Pressable>
+        </View>
+
+        {mode === "signup" ? (
+          <TextInput
+            placeholder="Username"
+            placeholderTextColor={COLORS.subtext}
+            value={username}
+            onChangeText={setUsername}
+            style={styles.input}
+          />
+        ) : null}
+
+        <TextInput
+          placeholder="Email"
+          placeholderTextColor={COLORS.subtext}
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+
+        <TextInput
+          placeholder="Password"
+          placeholderTextColor={COLORS.subtext}
+          value={password}
+          onChangeText={setPassword}
+          style={styles.input}
+          secureTextEntry
+        />
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
+          <Text style={styles.submitText}>
+            {loading ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
+          </Text>
+        </Pressable>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    gap: SPACING.md,
-  },
-  kicker: {
-    color: "white",
-    opacity: 0.9,
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  title: {
-    color: "white",
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 36,
-  },
-  subtitle: {
-    color: "white",
-    opacity: 0.9,
-    fontSize: 14,
-    lineHeight: 20,
-  },
   card: {
     backgroundColor: COLORS.card,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.lg,
+    gap: SPACING.md,
+    marginTop: 60,
+  },
+  eyebrow: {
+    color: COLORS.primary,
+    textTransform: "uppercase",
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  title: {
+    color: COLORS.text,
+    fontSize: 28,
+    fontWeight: "800",
+  },
+  switchRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+  switchBtn: {
+    flex: 1,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card2,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  switchActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "rgba(198,255,0,0.12)",
+  },
+  switchText: {
+color: COLORS.subtext,
+    fontWeight: "700",
+  },
+  switchTextActive: {
+    color: COLORS.primary,
+  },
+  input: {
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: SPACING.xl,
-    gap: SPACING.md,
-  },
-  cardTitle: {
+    backgroundColor: COLORS.card2,
     color: COLORS.text,
-    fontSize: 20,
-    fontWeight: "700",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  cardText: {
-    color: COLORS.subtext,
-    fontSize: 14,
-    lineHeight: 20,
+  submitBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.pill,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  submitText: {
+    color: "#050507",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  error: {
+    color: "#ff7a7a",
+    fontSize: 13,
   },
 });

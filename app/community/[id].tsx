@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 
@@ -7,31 +7,27 @@ import SectionTitle from "@/components/SectionTitle";
 import PrimaryButton from "@/components/PrimaryButton";
 import ProgressBar from "@/components/ProgressBar";
 import LeaderboardRow from "@/components/LeaderboardRow";
+import LiveScreenState from "@/components/LiveScreenState";
 
-import {
-  getCampaignsByCommunity,
-  getCommunityById,
-  leaderboardBase,
-} from "@/data/mock";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
 
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { joinedCommunityIds, joinCommunity } = useAppState();
+  const { communities, campaigns, leaderboard, loading, error } = useLiveAppData();
 
-  const community = getCommunityById(id || "");
-  const communityCampaigns = getCampaignsByCommunity(id || "");
-
-  const {
-    joinedCommunityIds,
-    joinCommunity,
-    currentXp,
-    profile,
-  } = useAppState();
+  const community = communities.find((item) => item.id === (id || ""));
+  const communityCampaigns = useMemo(
+    () => campaigns.filter((item) => item.communityId === (id || "")),
+    [campaigns, id]
+  );
 
   if (!community) {
     return (
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
         <Text style={styles.notFound}>Community not found.</Text>
       </Screen>
     );
@@ -44,22 +40,11 @@ export default function CommunityDetailScreen() {
     Alert.alert(joined ? "Community left" : "Community joined");
   }
 
-  const communityLeaders = [
-    ...leaderboardBase.slice(0, 3),
-    {
-      id: "me",
-      username: profile?.username || "You",
-      xp: currentXp,
-      title: profile?.title || "Elite Raider",
-      banner: profile?.banner,
-    },
-  ]
-    .sort((a, b) => b.xp - a.xp)
-    .map((item, index) => ({
-      ...item,
-      rank: index + 1,
-      isCurrentUser: item.id === "me",
-    }));
+  const communityLeaders = leaderboard.map((item, index) => ({
+    ...item,
+    rank: index + 1,
+    title: `Level ${item.level}`,
+  }));
 
   return (
     <>
@@ -73,6 +58,8 @@ export default function CommunityDetailScreen() {
       />
 
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
+
         <View style={styles.hero}>
           <Text style={styles.name}>{community.name}</Text>
           <Text style={styles.meta}>{community.members.toLocaleString()} members</Text>
@@ -152,36 +139,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
     gap: SPACING.md,
-
     shadowColor: COLORS.primary,
     shadowOpacity: 0.1,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
     elevation: 4,
   },
-
   name: {
     color: COLORS.text,
     fontSize: 24,
     fontWeight: "800",
   },
-
   meta: {
     color: COLORS.subtext,
     fontSize: 13,
   },
-
   desc: {
     color: COLORS.subtext,
     fontSize: 14,
     lineHeight: 20,
   },
-
   stats: {
     flexDirection: "row",
     gap: SPACING.md,
   },
-
   stat: {
     flex: 1,
     backgroundColor: COLORS.card2,
@@ -190,19 +171,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   statLabel: {
     color: COLORS.subtext,
     fontSize: 12,
   },
-
   statValue: {
     color: COLORS.text,
     fontSize: 16,
     fontWeight: "700",
     marginTop: 6,
   },
-
   campaignCard: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
@@ -211,31 +189,26 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     gap: SPACING.md,
   },
-
   row: {
     flexDirection: "row",
     gap: SPACING.md,
     alignItems: "flex-start",
   },
-
   campaignTitle: {
     color: COLORS.text,
     fontSize: 17,
     fontWeight: "800",
   },
-
   campaignMeta: {
     color: COLORS.subtext,
     fontSize: 12,
     marginTop: 4,
   },
-
   campaignDesc: {
     color: COLORS.subtext,
     fontSize: 13,
     lineHeight: 18,
   },
-
   badge: {
     backgroundColor: "rgba(198,255,0,0.12)",
     borderRadius: RADIUS.pill,
@@ -245,13 +218,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(198,255,0,0.30)",
   },
-
   badgeText: {
     color: COLORS.primary,
     fontSize: 12,
     fontWeight: "800",
   },
-
   notFound: {
     color: COLORS.text,
     fontSize: 16,

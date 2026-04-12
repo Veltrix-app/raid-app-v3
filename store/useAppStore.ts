@@ -42,6 +42,7 @@ type AppState = {
   claimedRewards: string[];
   openedLootboxIds: string[];
   questStatuses: Record<string, QuestStatus>;
+  questProofs: Record<string, string>;
 
   unreadCount: number;
   notificationsFeed: NotificationItem[];
@@ -60,7 +61,7 @@ type AppState = {
   claimReward: (id: string) => { ok: boolean; reason?: string };
   openLootbox: (id: string) => LootboxOpenResult;
 
-  submitQuest: (id: string) => void;
+  submitQuest: (id: string, proof?: string) => void;
   approveQuestPrototype: (id: string) => void;
 
   connectWallet: () => void;
@@ -71,6 +72,17 @@ type AppState = {
 
   updateProfile: (updates: Partial<UserProfile>) => void;
   markNotificationsRead: () => void;
+  hydrateRemoteProgress: (payload: {
+    xp: number;
+    level: number;
+    streakCount: number;
+    joinedCommunities: string[];
+    confirmedRaids: string[];
+    claimedRewards: string[];
+    openedLootboxIds: string[];
+    unlockedRewardIds: string[];
+    questStatuses: Record<string, QuestStatus>;
+  }) => void;
   resetProgress: () => void;
 };
 
@@ -213,6 +225,10 @@ const initialBadges = evaluateBadges({
   streakCount: 1,
 });
 
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values));
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -228,6 +244,7 @@ export const useAppStore = create<AppState>()(
       claimedRewards: [],
       openedLootboxIds: [],
       questStatuses: initialQuestStatuses,
+      questProofs: {},
 
       unreadCount: 1,
       notificationsFeed: initialNotifications,
@@ -240,6 +257,55 @@ export const useAppStore = create<AppState>()(
 
       streakCount: 1,
       lastActiveDate: new Date().toISOString(),
+
+      hydrateRemoteProgress: (payload) =>
+        set((state) => {
+          const safeQuestStatuses = {
+            ...buildInitialQuestStatuses(),
+            ...payload.questStatuses,
+          };
+
+          const engine = evaluateCampaignEngine(
+            safeQuestStatuses,
+            payload.confirmedRaids
+          );
+
+          const mergedUnlockedRewardIds = uniqueStrings([
+            ...engine.unlockedRewardIds,
+            ...payload.unlockedRewardIds,
+          ]);
+
+          const nextBadges = evaluateBadges({
+            joinedCommunities: payload.joinedCommunities,
+            confirmedRaids: payload.confirmedRaids,
+            claimedRewards: payload.claimedRewards,
+            questStatuses: safeQuestStatuses,
+            completedCampaignIds: engine.completedCampaignIds,
+            xp: payload.xp,
+            streakCount: payload.streakCount,
+          });
+
+          return {
+            xp: payload.xp,
+            level: payload.level || calculateLevel(payload.xp),
+            nextLevelXp: calculateNextLevelXp(payload.xp),
+
+            joinedCommunities: payload.joinedCommunities,
+            confirmedRaids: payload.confirmedRaids,
+            claimedRewards: payload.claimedRewards,
+            openedLootboxIds: payload.openedLootboxIds,
+            questStatuses: safeQuestStatuses,
+            questProofs: state.questProofs,
+
+            campaignProgressMap: engine.campaignProgressMap,
+            completedCampaignIds: engine.completedCampaignIds,
+            unlockedRewardIds: mergedUnlockedRewardIds,
+            unlockedBadgeIds: nextBadges,
+
+            streakCount: payload.streakCount,
+            lastActiveDate: state.lastActiveDate,
+          };
+        }),
 
       registerDailyActivity: () =>
         set((state) => {
@@ -491,11 +557,15 @@ export const useAppStore = create<AppState>()(
         };
       },
 
-      submitQuest: (id: string) =>
+      submitQuest: (id: string, proof = "") =>
         set((state) => ({
           questStatuses: {
             ...state.questStatuses,
             [id]: "pending",
+          },
+          questProofs: {
+            ...state.questProofs,
+            [id]: proof,
           },
           unreadCount: state.unreadCount + 1,
           notificationsFeed: addNotification(
@@ -663,6 +733,7 @@ export const useAppStore = create<AppState>()(
           claimedRewards: [],
           openedLootboxIds: [],
           questStatuses: freshQuestStatuses,
+          questProofs: {},
           unreadCount: 1,
           notificationsFeed: initialNotifications,
           campaignProgressMap: freshEngine.campaignProgressMap,
@@ -688,6 +759,7 @@ export const useAppStore = create<AppState>()(
         claimedRewards: state.claimedRewards,
         openedLootboxIds: state.openedLootboxIds,
         questStatuses: state.questStatuses,
+        questProofs: state.questProofs,
         unreadCount: state.unreadCount,
         notificationsFeed: state.notificationsFeed,
         profile: state.profile,

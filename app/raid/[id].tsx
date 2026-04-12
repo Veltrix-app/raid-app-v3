@@ -7,22 +7,28 @@ import SectionTitle from "@/components/SectionTitle";
 import PrimaryButton from "@/components/PrimaryButton";
 import ProgressBar from "@/components/ProgressBar";
 import XPGainToast from "@/components/XPGainToast";
+import LiveScreenState from "@/components/LiveScreenState";
 
-import { getRaidById } from "@/data/mock";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
 
 export default function RaidDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { confirmRaid, confirmedRaidIds } = useAppState();
+  const { raids, loading, error } = useLiveAppData();
 
   const [showXP, setShowXP] = useState(false);
 
-  const raid = useMemo(() => getRaidById(id || ""), [id]);
+  const raid = useMemo(
+    () => raids.find((item) => item.id === (id || "")),
+    [raids, id]
+  );
 
   if (!raid) {
     return (
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
         <Text style={styles.notFound}>Raid not found.</Text>
       </Screen>
     );
@@ -53,6 +59,8 @@ export default function RaidDetailScreen() {
       />
 
       <Screen>
+        <LiveScreenState loading={loading} error={error} />
+
         <ImageBackground
           source={{ uri: raid.banner }}
           style={styles.hero}
@@ -79,7 +87,6 @@ export default function RaidDetailScreen() {
           </View>
 
           <ProgressBar progress={raid.progress} />
-
           <Text style={styles.progressLabel}>{raid.progress}% campaign push progress</Text>
         </View>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { router, Redirect } from "expo-router";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -13,22 +13,32 @@ import SearchInput from "@/components/SearchInput";
 import GlowCard from "@/components/GlowCard";
 import LevelUpBurst from "@/components/LevelUpBurst";
 import BadgeUnlockToast from "@/components/BadgeUnlockToast";
+import LiveScreenState from "@/components/LiveScreenState";
 
-import { badgesCatalog, communities, raids, rewards } from "@/data/mock";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
 
 export default function HomeScreen() {
   const {
     currentLevel,
     currentXp,
     unreadNotificationCount,
-    isSignedIn,
     claimedRewardIds,
     streakCount,
     registerDailyActivity,
-    unlockedBadgeIds,
+    joinedCommunityIds,
   } = useAppState();
+
+  const {
+    communities,
+    raids,
+    rewards,
+    badges,
+    unlockedBadgeIds,
+    loading,
+    error,
+  } = useLiveAppData();
 
   const [query, setQuery] = useState("");
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -58,25 +68,26 @@ export default function HomeScreen() {
   }, [unlockedBadgeIds]);
 
   const filteredCommunities = useMemo(() => {
-    if (!query.trim()) return communities;
+    const withJoined = communities.map((item) => ({
+      ...item,
+      joined: joinedCommunityIds.includes(item.id),
+    }));
 
-    return communities.filter((item) =>
+    if (!query.trim()) return withJoined;
+
+    return withJoined.filter((item) =>
       item.name.toLowerCase().includes(query.toLowerCase())
     );
-  }, [query]);
+  }, [communities, query, joinedCommunityIds]);
 
   const featuredReward = useMemo(() => {
-    const claimable = rewards.find((reward) => !claimedRewardIds.includes(reward.id));
-    return claimable || rewards[0];
-  }, [claimedRewardIds]);
+    const available = rewards.filter((reward) => !claimedRewardIds.includes(reward.id));
+    return available[0] || rewards[0] || null;
+  }, [rewards, claimedRewardIds]);
 
   const unlockedBadge = newBadgeId
-    ? badgesCatalog.find((badge) => badge.id === newBadgeId) || null
+    ? badges.find((badge) => badge.id === newBadgeId) || null
     : null;
-
-  if (!isSignedIn) {
-    return <Redirect href="/sign-in" />;
-  }
 
   return (
     <Screen>
@@ -124,6 +135,8 @@ export default function HomeScreen() {
           </View>
         </View>
       </LinearGradient>
+
+      <LiveScreenState loading={loading} error={error} />
 
       <View style={styles.row}>
         <StatCard label="Level" value={String(currentLevel)} />

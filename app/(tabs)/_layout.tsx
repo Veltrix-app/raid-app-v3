@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import AuthGate from "@/components/AuthGate";
 import { COLORS } from "@/constants/theme";
-import { House, Megaphone, ScrollText, Gift, Trophy, User } from "lucide-react-native";
+import { Building2, Gift, House, Megaphone, ScrollText, Trophy, User } from "lucide-react-native";
 import { useProgressSync } from "@/hooks/useProgressSync";
 import { useActionSync } from "@/hooks/useActionSync";
 
@@ -36,6 +36,13 @@ function TabsContent() {
         options={{
           title: "Raids",
           tabBarIcon: ({ color, size }) => <Megaphone color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="projects"
+        options={{
+          title: "Projects",
+          tabBarIcon: ({ color, size }) => <Building2 color={color} size={size} />,
         }}
       />
       <Tabs.Screen

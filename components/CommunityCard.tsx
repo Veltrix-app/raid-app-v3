@@ -14,7 +14,15 @@ export default function CommunityCard({ item }: Props) {
   const joined = joinedCommunityIds.includes(item.id);
 
   return (
-    <Pressable style={[styles.card, joined && styles.cardJoined]} onPress={() => router.push(`/community/${item.id}`)}>
+    <Pressable
+      style={[styles.card, joined && styles.cardJoined]}
+      onPress={() =>
+        router.push({
+          pathname: "/project/[id]",
+          params: { id: item.id },
+        })
+      }
+    >
       <View style={styles.hero}>
         <View style={styles.logoWrap}>
           <Text style={styles.logoText}>{item.logo || item.name.slice(0, 1)}</Text>

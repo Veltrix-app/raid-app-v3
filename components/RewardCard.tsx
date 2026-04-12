@@ -7,12 +7,14 @@ import {
   Image,
   Animated,
 } from "react-native";
+import { router } from "expo-router";
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
-import { Reward, RewardRarity } from "@/types";
+import { RewardRarity } from "@/types";
 import { useAppState } from "@/hooks/useAppState";
+import { LiveReward } from "@/store/useLiveAppStore";
 
 type Props = {
-  item: Reward;
+  item: LiveReward;
   onPress?: () => void;
 };
 
@@ -105,8 +107,10 @@ export default function RewardCard({ item, onPress }: Props) {
     >
       <Pressable
         style={[styles.card, claimed && styles.cardClaimed]}
-        onPress={onPress}
-        disabled={!claimable}
+        onPress={
+          onPress ||
+          (() => router.push(`/reward/${item.id}` as never))
+        }
       >
         <Image source={{ uri: item.icon }} style={styles.icon} />
 

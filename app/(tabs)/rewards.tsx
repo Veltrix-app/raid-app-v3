@@ -1,116 +1,166 @@
-import React from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import Screen from "@/components/Screen";
 import SectionTitle from "@/components/SectionTitle";
+import SearchInput from "@/components/SearchInput";
+import FilterChip from "@/components/FilterChip";
+import RewardCard from "@/components/RewardCard";
 import LiveScreenState from "@/components/LiveScreenState";
 
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
+import { useAppState } from "@/hooks/useAppState";
 import { useLiveAppData } from "@/hooks/useLiveAppData";
 
-export default function RewardsScreen() {
-  const { rewards, loading, error } = useLiveAppData();
+type RewardFilter = "all" | "claimable" | "high-value";
 
-  function handleRewardPress(title: string) {
-    Alert.alert(
-      "Live reward loaded",
-      `${title} is now coming from Supabase. Claim wiring is the next step.`
-    );
-  }
+export default function RewardsScreen() {
+  const { rewards, campaigns, loading, error } = useLiveAppData();
+  const { claimedRewardIds, currentXp, isRewardUnlocked } = useAppState();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<RewardFilter>("all");
+
+  const filteredRewards = useMemo(() => {
+    let items = rewards;
+
+    if (query.trim()) {
+      const normalized = query.toLowerCase();
+      items = items.filter(
+        (reward) =>
+          reward.title.toLowerCase().includes(normalized) ||
+          reward.description.toLowerCase().includes(normalized) ||
+          reward.type.toLowerCase().includes(normalized)
+      );
+    }
+
+    if (filter === "claimable") {
+      items = items.filter(
+        (reward) =>
+          isRewardUnlocked(reward.id) &&
+          currentXp >= reward.cost &&
+          !claimedRewardIds.includes(reward.id)
+      );
+    }
+
+    if (filter === "high-value") {
+      items = items.filter((reward) => reward.cost >= 500);
+    }
+
+    return items.sort((a, b) => {
+      const aClaimable =
+        isRewardUnlocked(a.id) && currentXp >= a.cost && !claimedRewardIds.includes(a.id);
+      const bClaimable =
+        isRewardUnlocked(b.id) && currentXp >= b.cost && !claimedRewardIds.includes(b.id);
+
+      return Number(bClaimable) - Number(aClaimable) || b.cost - a.cost;
+    });
+  }, [rewards, query, filter, isRewardUnlocked, currentXp, claimedRewardIds]);
+
+  const claimableCount = rewards.filter(
+    (reward) =>
+      isRewardUnlocked(reward.id) &&
+      currentXp >= reward.cost &&
+      !claimedRewardIds.includes(reward.id)
+  ).length;
+  const linkedCampaignCount = rewards.filter((reward) => reward.campaignId).length;
 
   return (
     <Screen>
       <SectionTitle
         title="Rewards"
-        subtitle="Live rewards from your backend"
+        subtitle="Track what is unlocked, what is close, and what is worth pushing for next"
       />
 
       <LiveScreenState loading={loading} error={error} />
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoText}>
-          Rewards are now loaded from Supabase. Claim execution will be connected in the next step.
+      <View style={styles.hero}>
+        <Text style={styles.heroLabel}>Reward Readiness</Text>
+        <Text style={styles.heroValue}>{claimableCount}</Text>
+        <Text style={styles.heroSub}>
+          rewards are claim-ready right now. {linkedCampaignCount} rewards are already tied to live
+          campaigns.
         </Text>
       </View>
 
-      {rewards.map((item) => (
-        <Pressable
-          key={item.id}
-          style={styles.card}
-          onPress={() => handleRewardPress(item.title)}
-        >
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.meta}>
-                {item.type} • {item.rarity || "common"}
+      <SearchInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search rewards..."
+      />
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.filters}>
+          <FilterChip label="All" active={filter === "all"} onPress={() => setFilter("all")} />
+          <FilterChip
+            label="Claimable"
+            active={filter === "claimable"}
+            onPress={() => setFilter("claimable")}
+          />
+          <FilterChip
+            label="High Value"
+            active={filter === "high-value"}
+            onPress={() => setFilter("high-value")}
+          />
+        </View>
+      </ScrollView>
+
+      {filteredRewards.map((item) => {
+        const linkedCampaign = item.campaignId
+          ? campaigns.find((campaign) => campaign.id === item.campaignId)
+          : null;
+
+        return (
+          <View key={item.id} style={styles.rewardWrap}>
+            <RewardCard item={item} />
+            {linkedCampaign ? (
+              <Text style={styles.linkedCampaignText}>
+                Linked to {linkedCampaign.title}
               </Text>
-            </View>
-
-            <View style={styles.costBadge}>
-              <Text style={styles.costText}>{item.cost} XP</Text>
-            </View>
+            ) : null}
           </View>
-
-          <Text style={styles.description}>{item.description}</Text>
-        </Pressable>
-      ))}
+        );
+      })}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  infoBox: {
-    backgroundColor: "rgba(198,255,0,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(198,255,0,0.18)",
-    borderRadius: 16,
-    padding: 14,
-  },
-  infoText: {
-    color: COLORS.subtext,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  card: {
+  hero: {
     backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: SPACING.md,
+    borderColor: COLORS.borderStrong,
+    gap: 8,
   },
-  row: {
-    flexDirection: "row",
-    gap: SPACING.md,
-    alignItems: "flex-start",
+  heroLabel: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
-  title: {
+  heroValue: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 34,
     fontWeight: "800",
   },
-  meta: {
-    color: COLORS.subtext,
-    fontSize: 12,
-    marginTop: 4,
-    textTransform: "capitalize",
-  },
-  description: {
+  heroSub: {
     color: COLORS.subtext,
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
   },
-  costBadge: {
-    backgroundColor: COLORS.card2,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: "flex-start",
+  filters: {
+    flexDirection: "row",
+    gap: SPACING.sm,
   },
-  costText: {
-    color: COLORS.text,
-    fontWeight: "700",
+  rewardWrap: {
+    gap: 8,
+  },
+  linkedCampaignText: {
+    color: COLORS.subtext,
     fontSize: 12,
+    lineHeight: 18,
+    paddingHorizontal: 2,
   },
 });

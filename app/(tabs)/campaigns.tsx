@@ -8,6 +8,7 @@ import ProgressBar from "@/components/ProgressBar";
 import SearchInput from "@/components/SearchInput";
 import FilterChip from "@/components/FilterChip";
 import LiveScreenState from "@/components/LiveScreenState";
+import DiscoveryCampaignCard from "@/components/DiscoveryCampaignCard";
 
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useLiveAppData } from "@/hooks/useLiveAppData";
@@ -15,7 +16,7 @@ import { useLiveAppData } from "@/hooks/useLiveAppData";
 type CampaignFilter = "all" | "active" | "high-xp";
 
 export default function CampaignsScreen() {
-  const { campaigns, communities, loading, error } = useLiveAppData();
+  const { campaigns, communities, rankedCampaigns, loading, error } = useLiveAppData();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CampaignFilter>("all");
 
@@ -86,6 +87,18 @@ export default function CampaignsScreen() {
           </Pressable>
         );
       })}
+
+      {rankedCampaigns.length > 0 ? (
+        <>
+          <SectionTitle
+            title="Best opportunities"
+            subtitle="High-signal campaigns ranked by momentum, rewards and fit"
+          />
+          {rankedCampaigns.slice(0, 3).map((item) => (
+            <DiscoveryCampaignCard key={item.id} item={item} badgeLabel="Opportunity" />
+          ))}
+        </>
+      ) : null}
     </Screen>
   );
 }

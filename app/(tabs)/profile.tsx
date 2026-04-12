@@ -26,9 +26,6 @@ export default function ProfileScreen() {
     joinedCommunityCount,
     claimCount,
     streakCount,
-    unlockedRewardIds,
-    completedCampaignIds,
-    questStatuses,
     resetProgress,
   } = useAppState();
 
@@ -38,6 +35,11 @@ export default function ProfileScreen() {
     unlockedBadgeIds,
     rewards,
     notificationsFeed,
+    canonicalUnlockedRewardIds,
+    completedCampaignIds,
+    canonicalQuestStatuses,
+    canonicalJoinedCommunities,
+    canonicalClaimedRewards,
     loading: liveLoading,
     error,
   } = useLiveAppData();
@@ -47,13 +49,14 @@ export default function ProfileScreen() {
   const claimableRewardCount = useMemo(
     () =>
       rewards.filter(
-        (reward) => unlockedRewardIds.includes(reward.id) && reward.claimable !== false
+        (reward) =>
+          canonicalUnlockedRewardIds.includes(reward.id) && reward.claimable !== false
       ).length,
-    [rewards, unlockedRewardIds]
+    [canonicalUnlockedRewardIds, rewards]
   );
   const pendingReviewCount = useMemo(
-    () => Object.values(questStatuses).filter((status) => status === "pending").length,
-    [questStatuses]
+    () => Object.values(canonicalQuestStatuses).filter((status) => status === "pending").length,
+    [canonicalQuestStatuses]
   );
   const recentActivity = useMemo(() => notificationsFeed.slice(0, 3), [notificationsFeed]);
 
@@ -73,7 +76,7 @@ export default function ProfileScreen() {
   const reputationRank = profile?.reputationRank ?? 0;
   const questsCompleted = profile?.questsCompleted ?? completedQuestCount;
   const raidsCompleted = profile?.raidsCompleted ?? confirmedRaidCount;
-  const rewardsClaimed = profile?.rewardsClaimed ?? claimCount;
+  const rewardsClaimed = profile?.rewardsClaimed ?? canonicalClaimedRewards.length ?? claimCount;
   const walletText = walletConnected ? profile?.wallet || "Wallet connected" : "Wallet not connected";
 
   function handleWalletConnect() {
@@ -148,7 +151,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.row}>
-        <StatCard label="Communities" value={String(joinedCommunityCount)} />
+        <StatCard label="Communities" value={String(canonicalJoinedCommunities.length || joinedCommunityCount)} />
         <StatCard label="Claimed rewards" value={String(rewardsClaimed)} />
       </View>
 

@@ -24,13 +24,8 @@ export default function HomeScreen() {
   const {
     currentLevel,
     currentXp,
-    claimedRewardIds,
-    unlockedRewardIds,
     streakCount,
     registerDailyActivity,
-    joinedCommunityIds,
-    completedCampaignIds,
-    questStatuses,
   } = useAppState();
 
   const {
@@ -43,6 +38,11 @@ export default function HomeScreen() {
     discoveredCommunities,
     notificationsFeed,
     unreadNotificationCount,
+    canonicalClaimedRewards,
+    canonicalUnlockedRewardIds,
+    canonicalJoinedCommunities,
+    completedCampaignIds,
+    canonicalQuestStatuses,
     loading,
     error,
   } = useLiveAppData();
@@ -83,29 +83,29 @@ export default function HomeScreen() {
   }, [discoveredCommunities, query]);
 
   const featuredReward = useMemo(() => {
-    const available = rewards.filter((reward) => !claimedRewardIds.includes(reward.id));
+    const available = rewards.filter((reward) => !canonicalClaimedRewards.includes(reward.id));
     return available[0] || rewards[0] || null;
-  }, [rewards, claimedRewardIds]);
+  }, [rewards, canonicalClaimedRewards]);
 
   const claimableRewards = useMemo(
     () =>
       rewards.filter(
         (reward) =>
-          unlockedRewardIds.includes(reward.id) &&
-          !claimedRewardIds.includes(reward.id) &&
+          canonicalUnlockedRewardIds.includes(reward.id) &&
+          !canonicalClaimedRewards.includes(reward.id) &&
           reward.claimable !== false
       ),
-    [claimedRewardIds, rewards, unlockedRewardIds]
+    [canonicalClaimedRewards, canonicalUnlockedRewardIds, rewards]
   );
 
   const pendingQuestCount = useMemo(
-    () => Object.values(questStatuses).filter((status) => status === "pending").length,
-    [questStatuses]
+    () => Object.values(canonicalQuestStatuses).filter((status) => status === "pending").length,
+    [canonicalQuestStatuses]
   );
 
   const approvedQuestCount = useMemo(
-    () => Object.values(questStatuses).filter((status) => status === "approved").length,
-    [questStatuses]
+    () => Object.values(canonicalQuestStatuses).filter((status) => status === "approved").length,
+    [canonicalQuestStatuses]
   );
 
   const recentActivity = useMemo(() => notificationsFeed.slice(0, 3), [notificationsFeed]);
@@ -227,7 +227,9 @@ export default function HomeScreen() {
             <Text style={styles.progressionTitle}>Progression snapshot</Text>
           </View>
           <View style={styles.progressionPill}>
-            <Text style={styles.progressionPillText}>{joinedCommunityIds.length} communities</Text>
+            <Text style={styles.progressionPillText}>
+              {canonicalJoinedCommunities.length} communities
+            </Text>
           </View>
         </View>
 

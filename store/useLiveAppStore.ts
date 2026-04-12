@@ -112,6 +112,16 @@ export type LiveBadge = {
   unlockType: string;
 };
 
+export type LiveUserProgress = {
+  joinedCommunities: string[];
+  confirmedRaids: string[];
+  claimedRewards: string[];
+  openedLootboxIds: string[];
+  unlockedRewardIds: string[];
+  questStatuses: Record<string, "open" | "pending" | "approved" | "rejected">;
+  updatedAt?: string;
+};
+
 type LiveAppState = {
   loading: boolean;
   error: string | null;
@@ -125,6 +135,7 @@ type LiveAppState = {
   badges: LiveBadge[];
   unlockedBadgeIds: string[];
   projectReputation: LiveProjectReputation[];
+  userProgress: LiveUserProgress | null;
   notificationsFeed: NotificationItem[];
   unreadNotificationCount: number;
 
@@ -137,6 +148,7 @@ type LiveAppState = {
   loadBadges: () => Promise<void>;
   loadUserBadges: () => Promise<void>;
   loadProjectReputation: () => Promise<void>;
+  loadUserProgress: () => Promise<void>;
   loadNotifications: () => Promise<void>;
   markNotificationsRead: () => Promise<void>;
   loadAll: () => Promise<void>;
@@ -156,6 +168,7 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
   badges: [],
   unlockedBadgeIds: [],
   projectReputation: [],
+  userProgress: null,
   notificationsFeed: [],
   unreadNotificationCount: 0,
 
@@ -449,6 +462,47 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
     }
   },
 
+  loadUserProgress: async () => {
+    try {
+      const authUserId = useAuthStore.getState().authUserId;
+      if (!authUserId) {
+        set({ userProgress: null });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_progress")
+        .select("*")
+        .eq("auth_user_id", authUserId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      set({
+        userProgress: data
+          ? {
+              joinedCommunities: data.joined_communities ?? [],
+              confirmedRaids: data.confirmed_raids ?? [],
+              claimedRewards: data.claimed_rewards ?? [],
+              openedLootboxIds: data.opened_lootbox_ids ?? [],
+              unlockedRewardIds: data.unlocked_reward_ids ?? [],
+              questStatuses: data.quest_statuses ?? {},
+              updatedAt: data.updated_at ?? undefined,
+            }
+          : {
+              joinedCommunities: [],
+              confirmedRaids: [],
+              claimedRewards: [],
+              openedLootboxIds: [],
+              unlockedRewardIds: [],
+              questStatuses: {},
+            },
+      });
+    } catch (err: any) {
+      set({ error: err?.message || "Failed to load user progress." });
+    }
+  },
+
   loadNotifications: async () => {
     try {
       const authUserId = useAuthStore.getState().authUserId;
@@ -505,6 +559,7 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
         useLiveAppStore.getState().loadBadges(),
         useLiveAppStore.getState().loadUserBadges(),
         useLiveAppStore.getState().loadProjectReputation(),
+        useLiveAppStore.getState().loadUserProgress(),
         useLiveAppStore.getState().loadNotifications(),
       ]);
 

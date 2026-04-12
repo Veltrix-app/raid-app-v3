@@ -20,7 +20,7 @@ import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 
 export default function CampaignDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCampaignProgress, isCampaignCompleted, streakCount } = useAppState();
+  const { streakCount } = useAppState();
   const {
     campaigns,
     communities,
@@ -29,6 +29,8 @@ export default function CampaignDetailScreen() {
     rewards,
     leaderboard,
     rankedCampaigns,
+    getCampaignProgress,
+    isCampaignCompleted,
     loading,
     error,
   } = useLiveAppData();

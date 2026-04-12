@@ -17,6 +17,7 @@ export function useLiveAppData() {
   const badges = useLiveAppStore((s) => s.badges);
   const unlockedBadgeIds = useLiveAppStore((s) => s.unlockedBadgeIds);
   const projectReputation = useLiveAppStore((s) => s.projectReputation);
+  const userProgress = useLiveAppStore((s) => s.userProgress);
   const notificationsFeed = useLiveAppStore((s) => s.notificationsFeed);
   const unreadNotificationCount = useLiveAppStore((s) => s.unreadNotificationCount);
   const loading = useLiveAppStore((s) => s.loading);
@@ -28,6 +29,46 @@ export function useLiveAppData() {
     loadAll();
   }, [authUserId]);
 
+  const canonicalJoinedCommunities =
+    userProgress && userProgress.joinedCommunities.length > 0
+      ? userProgress.joinedCommunities
+      : joinedCommunityIds;
+  const canonicalQuestStatuses = userProgress?.questStatuses ?? {};
+  const canonicalConfirmedRaids = userProgress?.confirmedRaids ?? [];
+  const canonicalClaimedRewards = userProgress?.claimedRewards ?? [];
+  const canonicalUnlockedRewardIds = userProgress?.unlockedRewardIds ?? [];
+
+  const derivedCampaignProgressMap = campaigns.reduce<Record<string, number>>((acc, campaign) => {
+    const campaignQuests = quests.filter((quest) => quest.campaignId === campaign.id);
+    const campaignRaids = raids.filter((raid) => raid.campaignId === campaign.id);
+    const totalItems = campaignQuests.length + campaignRaids.length;
+    const approvedQuestCount = campaignQuests.filter(
+      (quest) => canonicalQuestStatuses[quest.id] === "approved"
+    ).length;
+    const confirmedRaidCount = campaignRaids.filter((raid) =>
+      canonicalConfirmedRaids.includes(raid.id)
+    ).length;
+    const completedItems = approvedQuestCount + confirmedRaidCount;
+
+    acc[campaign.id] = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    return acc;
+  }, {});
+
+  const derivedCompletedCampaignIds = Object.entries(derivedCampaignProgressMap)
+    .filter(([, progress]) => progress === 100)
+    .map(([campaignId]) => campaignId);
+
+  const derivedUnlockedRewardIds = Array.from(
+    new Set([
+      ...canonicalUnlockedRewardIds,
+      ...rewards
+        .filter(
+          (reward) => reward.campaignId && derivedCompletedCampaignIds.includes(reward.campaignId)
+        )
+        .map((reward) => reward.id),
+    ])
+  );
+
   const campaignDiscovery = buildCampaignDiscovery({
     communities,
     campaigns,
@@ -35,9 +76,9 @@ export function useLiveAppData() {
     rewards,
     raids,
     projectReputation,
-    joinedCommunityIds,
-    campaignProgressMap,
-    completedCampaignIds,
+    joinedCommunityIds: canonicalJoinedCommunities,
+    campaignProgressMap: derivedCampaignProgressMap,
+    completedCampaignIds: derivedCompletedCampaignIds,
   });
 
   const communityDiscovery = buildCommunityDiscovery({
@@ -47,9 +88,9 @@ export function useLiveAppData() {
     rewards,
     raids,
     projectReputation,
-    joinedCommunityIds,
-    campaignProgressMap,
-    completedCampaignIds,
+    joinedCommunityIds: canonicalJoinedCommunities,
+    campaignProgressMap: derivedCampaignProgressMap,
+    completedCampaignIds: derivedCompletedCampaignIds,
   });
 
   return {
@@ -62,8 +103,16 @@ export function useLiveAppData() {
     badges,
     unlockedBadgeIds,
     projectReputation,
+    userProgress,
     notificationsFeed,
     unreadNotificationCount,
+    canonicalJoinedCommunities,
+    canonicalQuestStatuses,
+    canonicalConfirmedRaids,
+    canonicalClaimedRewards,
+    canonicalUnlockedRewardIds: derivedUnlockedRewardIds,
+    campaignProgressMap: derivedCampaignProgressMap,
+    completedCampaignIds: derivedCompletedCampaignIds,
     trendingCampaigns: campaignDiscovery.trendingCampaigns,
     recommendedCampaigns: campaignDiscovery.recommendedCampaigns,
     highRewardCampaigns: campaignDiscovery.highRewardCampaigns,
@@ -73,5 +122,8 @@ export function useLiveAppData() {
     error,
     reloadAll: loadAll,
     markNotificationsRead,
+    getCampaignProgress: (campaignId: string) => derivedCampaignProgressMap[campaignId] || 0,
+    isCampaignCompleted: (campaignId: string) =>
+      derivedCompletedCampaignIds.includes(campaignId),
   };
 }

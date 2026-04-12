@@ -18,6 +18,10 @@ export type Quest = {
   xp: number;
   status: QuestStatus;
   actionLabel?: string;
+  actionUrl?: string;
+  proofRequired?: boolean;
+  proofType?: string;
+  verificationType?: string;
 };
 
 export type Campaign = {

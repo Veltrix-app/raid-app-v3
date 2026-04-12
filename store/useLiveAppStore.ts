@@ -76,9 +76,14 @@ export type LiveQuest = {
   title: string;
   description: string;
   type: string;
+  questType?: string;
   xp: number;
   status: "open" | "pending" | "approved" | "rejected";
   actionLabel?: string;
+  actionUrl?: string;
+  proofRequired?: boolean;
+  proofType?: string;
+  verificationType?: string;
 };
 
 export type LiveBadge = {
@@ -290,9 +295,14 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
         title: row.title ?? "Quest",
         description: row.description ?? "",
         type: row.type ?? row.quest_type ?? "Task",
+        questType: row.quest_type ?? "custom",
         xp: row.xp ?? 0,
         status: row.status ?? "open",
         actionLabel: row.action_label ?? "Open Task",
+        actionUrl: row.action_url ?? "",
+        proofRequired: row.proof_required ?? false,
+        proofType: row.proof_type ?? "none",
+        verificationType: row.verification_type ?? "manual_review",
       }));
 
       set({ quests });

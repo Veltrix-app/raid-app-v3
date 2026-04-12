@@ -24,13 +24,11 @@ export default function HomeScreen() {
   const {
     currentLevel,
     currentXp,
-    unreadNotificationCount,
     claimedRewardIds,
     unlockedRewardIds,
     streakCount,
     registerDailyActivity,
     joinedCommunityIds,
-    notificationsFeed,
     completedCampaignIds,
     questStatuses,
   } = useAppState();
@@ -43,6 +41,8 @@ export default function HomeScreen() {
     trendingCampaigns,
     recommendedCampaigns,
     discoveredCommunities,
+    notificationsFeed,
+    unreadNotificationCount,
     loading,
     error,
   } = useLiveAppData();

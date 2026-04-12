@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { Session } from "@supabase/supabase-js";
+import { createAppNotification } from "@/lib/app-notifications";
 import { supabase } from "@/lib/supabase";
 import { AppUserProfile } from "@/types/auth";
 
@@ -211,6 +212,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (reputationError) {
       set({ loading: false, error: reputationError.message });
       return { ok: false, error: reputationError.message };
+    }
+
+    const { error: notificationError } = await createAppNotification({
+      authUserId,
+      title: "Welcome to Veltrix",
+      body: "Your account is live. Join a community, complete quests and start building reputation.",
+      type: "system",
+      metadata: { stage: "signup" },
+    });
+
+    if (notificationError) {
+      console.error("Signup notification creation failed:", notificationError.message);
     }
 
     const {

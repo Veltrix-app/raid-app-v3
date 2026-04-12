@@ -17,9 +17,12 @@ export function useLiveAppData() {
   const badges = useLiveAppStore((s) => s.badges);
   const unlockedBadgeIds = useLiveAppStore((s) => s.unlockedBadgeIds);
   const projectReputation = useLiveAppStore((s) => s.projectReputation);
+  const notificationsFeed = useLiveAppStore((s) => s.notificationsFeed);
+  const unreadNotificationCount = useLiveAppStore((s) => s.unreadNotificationCount);
   const loading = useLiveAppStore((s) => s.loading);
   const error = useLiveAppStore((s) => s.error);
   const loadAll = useLiveAppStore((s) => s.loadAll);
+  const markNotificationsRead = useLiveAppStore((s) => s.markNotificationsRead);
 
   useEffect(() => {
     loadAll();
@@ -59,6 +62,8 @@ export function useLiveAppData() {
     badges,
     unlockedBadgeIds,
     projectReputation,
+    notificationsFeed,
+    unreadNotificationCount,
     trendingCampaigns: campaignDiscovery.trendingCampaigns,
     recommendedCampaigns: campaignDiscovery.recommendedCampaigns,
     highRewardCampaigns: campaignDiscovery.highRewardCampaigns,
@@ -67,5 +72,6 @@ export function useLiveAppData() {
     loading,
     error,
     reloadAll: loadAll,
+    markNotificationsRead,
   };
 }

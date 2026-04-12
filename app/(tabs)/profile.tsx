@@ -28,13 +28,19 @@ export default function ProfileScreen() {
     streakCount,
     unlockedRewardIds,
     completedCampaignIds,
-    notificationsFeed,
     questStatuses,
     resetProgress,
   } = useAppState();
 
   const { profile, signOut, loading: authLoading } = useAuth();
-  const { badges, unlockedBadgeIds, rewards, loading: liveLoading, error } = useLiveAppData();
+  const {
+    badges,
+    unlockedBadgeIds,
+    rewards,
+    notificationsFeed,
+    loading: liveLoading,
+    error,
+  } = useLiveAppData();
 
   const progress = Math.min((currentXp / nextLevelXp) * 100, 100);
   const unlockedBadges = badges.filter((badge) => unlockedBadgeIds.includes(badge.id));

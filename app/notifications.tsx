@@ -7,10 +7,10 @@ import SectionTitle from "@/components/SectionTitle";
 import NotificationCard from "@/components/NotificationCard";
 
 import { COLORS } from "@/constants/theme";
-import { useAppState } from "@/hooks/useAppState";
+import { useLiveAppData } from "@/hooks/useLiveAppData";
 
 export default function NotificationsScreen() {
-  const { notificationsFeed, markNotificationsRead } = useAppState();
+  const { notificationsFeed, markNotificationsRead } = useLiveAppData();
   const unreadItems = notificationsFeed.filter((item) => !item.read).length;
   const questUpdates = notificationsFeed.filter((item) => item.type === "quest").length;
   const rewardUpdates = notificationsFeed.filter((item) => item.type === "reward").length;

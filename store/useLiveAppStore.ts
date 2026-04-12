@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
+import {
+  loadAppNotifications,
+  markAllAppNotificationsRead,
+} from "@/lib/app-notifications";
 import { useAuthStore } from "@/store/useAuthStore";
+import { NotificationItem } from "@/types";
 
 export type LeaderboardUser = {
   id: string;
@@ -120,6 +125,8 @@ type LiveAppState = {
   badges: LiveBadge[];
   unlockedBadgeIds: string[];
   projectReputation: LiveProjectReputation[];
+  notificationsFeed: NotificationItem[];
+  unreadNotificationCount: number;
 
   loadLeaderboard: () => Promise<void>;
   loadRaids: () => Promise<void>;
@@ -130,6 +137,8 @@ type LiveAppState = {
   loadBadges: () => Promise<void>;
   loadUserBadges: () => Promise<void>;
   loadProjectReputation: () => Promise<void>;
+  loadNotifications: () => Promise<void>;
+  markNotificationsRead: () => Promise<void>;
   loadAll: () => Promise<void>;
   clearError: () => void;
 };
@@ -147,6 +156,8 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
   badges: [],
   unlockedBadgeIds: [],
   projectReputation: [],
+  notificationsFeed: [],
+  unreadNotificationCount: 0,
 
   clearError: () => set({ error: null }),
 
@@ -438,6 +449,48 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
     }
   },
 
+  loadNotifications: async () => {
+    try {
+      const authUserId = useAuthStore.getState().authUserId;
+      if (!authUserId) {
+        set({ notificationsFeed: [], unreadNotificationCount: 0 });
+        return;
+      }
+
+      const { data, error } = await loadAppNotifications(authUserId);
+
+      if (error) throw error;
+
+      set({
+        notificationsFeed: data,
+        unreadNotificationCount: data.filter((item) => !item.read).length,
+      });
+    } catch (err: any) {
+      set({ error: err?.message || "Failed to load notifications." });
+    }
+  },
+
+  markNotificationsRead: async () => {
+    try {
+      const authUserId = useAuthStore.getState().authUserId;
+      if (!authUserId) return;
+
+      const { error } = await markAllAppNotificationsRead(authUserId);
+
+      if (error) throw error;
+
+      set((state) => ({
+        unreadNotificationCount: 0,
+        notificationsFeed: state.notificationsFeed.map((item) => ({
+          ...item,
+          read: true,
+        })),
+      }));
+    } catch (err: any) {
+      set({ error: err?.message || "Failed to mark notifications as read." });
+    }
+  },
+
   loadAll: async () => {
     set({ loading: true, error: null });
 
@@ -452,6 +505,7 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
         useLiveAppStore.getState().loadBadges(),
         useLiveAppStore.getState().loadUserBadges(),
         useLiveAppStore.getState().loadProjectReputation(),
+        useLiveAppStore.getState().loadNotifications(),
       ]);
 
       set({ loading: false });

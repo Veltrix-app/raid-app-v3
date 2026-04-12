@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createAppNotification } from "@/lib/app-notifications";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/store/useAppStore";
@@ -744,6 +745,30 @@ export function useActionSync() {
               console.error("Reward review flag creation failed:", flagError.message);
             }
           }
+
+          const notificationBody =
+            reward?.claim_method === "manual_fulfillment"
+              ? `${reward?.title ?? "Reward"} is now in the fulfillment queue.`
+              : `${reward?.title ?? "Reward"} has been submitted for automated claim handling.`;
+
+          const { error: notificationError } = await createAppNotification({
+            authUserId: currentAuthUserId,
+            title: "Reward claim submitted",
+            body: notificationBody,
+            type: "reward",
+            sourceTable: "reward_claims",
+            sourceId: insertedClaim?.id,
+            metadata: {
+              rewardId,
+              rewardTitle: reward?.title ?? "",
+              claimMethod: reward?.claim_method ?? "manual_fulfillment",
+              rewardCost: reward?.cost ?? 0,
+            },
+          });
+
+          if (notificationError) {
+            console.error("Reward notification creation failed:", notificationError.message);
+          }
         } else {
           console.error("Reward sync failed:", error.message);
         }
@@ -896,6 +921,35 @@ export function useActionSync() {
               duplicateSignals,
               proofText: questProofs[questId] ?? "",
             });
+
+            const { error: notificationError } = await createAppNotification({
+              authUserId: currentAuthUserId,
+              title:
+                finalDecision.status === "approved"
+                  ? "Quest auto-approved"
+                  : finalDecision.status === "rejected"
+                    ? "Quest rejected"
+                    : "Quest submitted",
+              body:
+                finalDecision.status === "approved"
+                  ? `${quest.title} met the live verification rules and was approved automatically.`
+                  : finalDecision.status === "rejected"
+                    ? `${quest.title} was rejected because the proof or validation rules did not pass.`
+                    : `${quest.title} was submitted and is now waiting for review.`,
+              type: "quest",
+              sourceTable: "quest_submissions",
+              sourceId: insertedSubmission.id,
+              metadata: {
+                questId,
+                questTitle: quest.title,
+                decisionStatus: finalDecision.status,
+                decisionReason: finalDecision.reason,
+              },
+            });
+
+            if (notificationError) {
+              console.error("Quest notification creation failed:", notificationError.message);
+            }
           }
 
           if (finalDecision.status !== "pending") {

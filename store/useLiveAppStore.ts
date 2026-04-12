@@ -35,6 +35,19 @@ export type LiveCommunity = {
   joined?: boolean;
 };
 
+export type LiveProjectReputation = {
+  projectId: string;
+  xp: number;
+  level: number;
+  streak: number;
+  trustScore: number;
+  contributionTier: string;
+  questsCompleted: number;
+  raidsCompleted: number;
+  rewardsClaimed: number;
+  rank: number;
+};
+
 export type LiveCampaign = {
   id: string;
   communityId: string;
@@ -89,6 +102,7 @@ type LiveAppState = {
   quests: LiveQuest[];
   badges: LiveBadge[];
   unlockedBadgeIds: string[];
+  projectReputation: LiveProjectReputation[];
 
   loadLeaderboard: () => Promise<void>;
   loadRaids: () => Promise<void>;
@@ -98,6 +112,7 @@ type LiveAppState = {
   loadQuests: () => Promise<void>;
   loadBadges: () => Promise<void>;
   loadUserBadges: () => Promise<void>;
+  loadProjectReputation: () => Promise<void>;
   loadAll: () => Promise<void>;
   clearError: () => void;
 };
@@ -114,6 +129,7 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
   quests: [],
   badges: [],
   unlockedBadgeIds: [],
+  projectReputation: [],
 
   clearError: () => set({ error: null }),
 
@@ -334,6 +350,56 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
     }
   },
 
+  loadProjectReputation: async () => {
+    try {
+      const authUserId = useAuthStore.getState().authUserId;
+      if (!authUserId) {
+        set({ projectReputation: [] });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_project_reputation")
+        .select("*")
+        .eq("auth_user_id", authUserId)
+        .order("xp", { ascending: false });
+
+      if (error) throw error;
+
+      const rows = (data || []) as any[];
+      const rankMap = new Map<string, number>();
+
+      await Promise.all(
+        rows.map(async (row) => {
+          const { count } = await supabase
+            .from("user_project_reputation")
+            .select("*", { count: "exact", head: true })
+            .eq("project_id", row.project_id)
+            .gt("xp", row.xp ?? 0);
+
+          rankMap.set(row.project_id, (count ?? 0) + 1);
+        })
+      );
+
+      const projectReputation: LiveProjectReputation[] = rows.map((row) => ({
+        projectId: row.project_id,
+        xp: row.xp ?? 0,
+        level: row.level ?? 1,
+        streak: row.streak ?? 0,
+        trustScore: row.trust_score ?? 50,
+        contributionTier: row.contribution_tier ?? "explorer",
+        questsCompleted: row.quests_completed ?? 0,
+        raidsCompleted: row.raids_completed ?? 0,
+        rewardsClaimed: row.rewards_claimed ?? 0,
+        rank: rankMap.get(row.project_id) ?? 0,
+      }));
+
+      set({ projectReputation });
+    } catch (err: any) {
+      set({ error: err?.message || "Failed to load project reputation." });
+    }
+  },
+
   loadAll: async () => {
     set({ loading: true, error: null });
 
@@ -347,6 +413,7 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
         useLiveAppStore.getState().loadQuests(),
         useLiveAppStore.getState().loadBadges(),
         useLiveAppStore.getState().loadUserBadges(),
+        useLiveAppStore.getState().loadProjectReputation(),
       ]);
 
       set({ loading: false });

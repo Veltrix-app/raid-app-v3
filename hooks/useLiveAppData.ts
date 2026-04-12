@@ -13,6 +13,7 @@ export function useLiveAppData() {
   const quests = useLiveAppStore((s) => s.quests);
   const badges = useLiveAppStore((s) => s.badges);
   const unlockedBadgeIds = useLiveAppStore((s) => s.unlockedBadgeIds);
+  const projectReputation = useLiveAppStore((s) => s.projectReputation);
   const loading = useLiveAppStore((s) => s.loading);
   const error = useLiveAppStore((s) => s.error);
   const loadAll = useLiveAppStore((s) => s.loadAll);
@@ -30,6 +31,7 @@ export function useLiveAppData() {
     quests,
     badges,
     unlockedBadgeIds,
+    projectReputation,
     loading,
     error,
     reloadAll: loadAll,

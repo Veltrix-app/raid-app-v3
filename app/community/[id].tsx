@@ -16,7 +16,7 @@ import { useLiveAppData } from "@/hooks/useLiveAppData";
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { joinedCommunityIds, joinCommunity } = useAppState();
-  const { communities, campaigns, leaderboard, loading, error } = useLiveAppData();
+  const { communities, campaigns, leaderboard, projectReputation, loading, error } = useLiveAppData();
 
   const community = communities.find((item) => item.id === (id || ""));
   const communityCampaigns = useMemo(
@@ -35,6 +35,9 @@ export default function CommunityDetailScreen() {
 
   const currentCommunity = community;
   const joined = joinedCommunityIds.includes(currentCommunity.id);
+  const communityReputation = projectReputation.find(
+    (item) => item.projectId === currentCommunity.id
+  );
   const communityLeaders = leaderboard.map((item, index) => ({
     ...item,
     rank: index + 1,
@@ -81,6 +84,64 @@ export default function CommunityDetailScreen() {
             title={joined ? "Leave community" : "Join community"}
             onPress={handleJoin}
           />
+        </View>
+
+        <View style={styles.reputationCard}>
+          <View style={styles.reputationHeader}>
+            <View>
+              <Text style={styles.reputationEyebrow}>Project Reputation</Text>
+              <Text style={styles.reputationTitle}>
+                {communityReputation
+                  ? communityReputation.contributionTier.toUpperCase()
+                  : "NOT STARTED"}
+              </Text>
+            </View>
+
+            <View style={styles.rankPill}>
+              <Text style={styles.rankLabel}>Community Rank</Text>
+              <Text style={styles.rankValue}>
+                {communityReputation?.rank ? `#${communityReputation.rank}` : "-"}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.reputationText}>
+            {communityReputation
+              ? `Inside ${currentCommunity.name}, your reputation is tracked separately from your global Veltrix score. This is what projects can use to spot their strongest contributors.`
+              : `You have not built project-specific reputation inside ${currentCommunity.name} yet. Complete quests and raids here to start earning local trust and rank.`}
+          </Text>
+
+          <View style={styles.stats}>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Project XP</Text>
+              <Text style={styles.statValue}>
+                {communityReputation?.xp?.toLocaleString() ?? "0"}
+              </Text>
+            </View>
+
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Trust</Text>
+              <Text style={styles.statValue}>
+                {communityReputation?.trustScore ?? 50}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.stats}>
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Approved quests</Text>
+              <Text style={styles.statValue}>
+                {communityReputation?.questsCompleted ?? 0}
+              </Text>
+            </View>
+
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Confirmed raids</Text>
+              <Text style={styles.statValue}>
+                {communityReputation?.raidsCompleted ?? 0}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <SectionTitle
@@ -144,6 +205,65 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
     elevation: 4,
+  },
+  reputationCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: SPACING.md,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  reputationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
+  reputationEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  reputationTitle: {
+    color: COLORS.text,
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 6,
+  },
+  reputationText: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  rankPill: {
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.card2,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    alignItems: "flex-end",
+  },
+  rankLabel: {
+    color: COLORS.subtext,
+    fontSize: 11,
+    textTransform: "uppercase",
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  rankValue: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 4,
   },
   name: {
     color: COLORS.text,

@@ -13,6 +13,7 @@ type VerificationQuestRow = {
   proof_type: string | null;
   auto_approve: boolean | null;
   verification_type: string | null;
+  verification_config: Record<string, unknown> | null;
 };
 
 type VerificationDecision = {
@@ -50,6 +51,141 @@ type ProjectLookupRow = {
   name: string;
 };
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isValidUrl(value: string) {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isHexWithLength(value: string, length: number) {
+  return new RegExp(`^0x[a-fA-F0-9]{${length}}$`).test(value.trim());
+}
+
+function getRequiredConfigKeys(quest: VerificationQuestRow) {
+  switch (quest.quest_type ?? "custom") {
+    case "social_follow":
+      return ["handle"];
+    case "social_like":
+    case "social_repost":
+    case "social_comment":
+      return ["postUrl"];
+    case "telegram_join":
+      return ["groupUrl"];
+    case "discord_join":
+      return ["inviteUrl"];
+    case "token_hold":
+      return ["contractAddress", "minimumBalance"];
+    case "nft_hold":
+      return ["contractAddress", "minimumOwned"];
+    case "onchain_tx":
+      return ["contractAddress", "method"];
+    case "url_visit":
+      return ["targetUrl"];
+    case "referral":
+      return ["minimumReferrals"];
+    case "manual_proof":
+      return ["instructions"];
+    default:
+      return [];
+  }
+}
+
+function getMissingConfigKeys(quest: VerificationQuestRow) {
+  const config = quest.verification_config ?? {};
+  const requiredKeys = getRequiredConfigKeys(quest);
+
+  return requiredKeys.filter((key) => {
+    const value = config[key];
+
+    if (typeof value === "number") {
+      return Number.isNaN(value);
+    }
+
+    if (typeof value === "boolean") {
+      return false;
+    }
+
+    if (Array.isArray(value)) {
+      return value.length === 0;
+    }
+
+    return !isNonEmptyString(value);
+  });
+}
+
+function validateProofInput(params: {
+  proofText: string;
+  proofType: string;
+  proofRequired: boolean;
+  questType: string;
+}) {
+  const { proofText, proofType, proofRequired, questType } = params;
+  const trimmedProof = proofText.trim();
+
+  if (!proofRequired || proofType === "none") {
+    return null;
+  }
+
+  if (!trimmedProof) {
+    return {
+      status: "rejected",
+      reason: "Proof required but not provided.",
+      flagType: "missing_proof",
+      severity: "medium",
+      metadata: { proofType, questType },
+    } satisfies VerificationDecision;
+  }
+
+  if (proofType === "url" && !isValidUrl(trimmedProof)) {
+    return {
+      status: "rejected",
+      reason: "Proof must be a valid URL.",
+      flagType: "invalid_proof_format",
+      severity: "medium",
+      metadata: { proofType, questType, proofPreview: trimmedProof.slice(0, 120) },
+    } satisfies VerificationDecision;
+  }
+
+  if (proofType === "tx_hash" && !isHexWithLength(trimmedProof, 64)) {
+    return {
+      status: "rejected",
+      reason: "Proof must be a valid transaction hash.",
+      flagType: "invalid_proof_format",
+      severity: "medium",
+      metadata: { proofType, questType, proofPreview: trimmedProof.slice(0, 80) },
+    } satisfies VerificationDecision;
+  }
+
+  if (proofType === "wallet" && !isHexWithLength(trimmedProof, 40)) {
+    return {
+      status: "rejected",
+      reason: "Proof must be a valid wallet address.",
+      flagType: "invalid_proof_format",
+      severity: "medium",
+      metadata: { proofType, questType, proofPreview: trimmedProof.slice(0, 80) },
+    } satisfies VerificationDecision;
+  }
+
+  if (proofType === "image" && trimmedProof.length < 8) {
+    return {
+      status: "rejected",
+      reason: "Image proof looks incomplete.",
+      flagType: "invalid_proof_format",
+      severity: "low",
+      metadata: { proofType, questType },
+    } satisfies VerificationDecision;
+  }
+
+  return null;
+}
+
 function evaluateSubmission(params: {
   quest: VerificationQuestRow;
   proofText: string;
@@ -72,6 +208,9 @@ function evaluateSubmission(params: {
   const verificationType = quest.verification_type ?? "manual_review";
   const questType = quest.quest_type ?? "custom";
   const autoApprove = quest.auto_approve ?? false;
+  const config = quest.verification_config ?? {};
+  const requiredConfigKeys = getRequiredConfigKeys(quest);
+  const missingConfigKeys = getMissingConfigKeys(quest);
   const walletRequired =
     proofType === "wallet" ||
     proofType === "tx_hash" ||
@@ -80,17 +219,15 @@ function evaluateSubmission(params: {
   const hasWalletContext = walletConnected || hasWalletSignal;
   const elevatedRisk = sybilScore >= 70 || trustScore <= 35;
 
-  if (proofRequired && proofType !== "none" && !trimmedProof) {
-    return {
-      status: "rejected",
-      reason: "Proof required but not provided.",
-      flagType: "missing_proof",
-      severity: "medium",
-      metadata: {
-        proofType,
-        verificationType,
-      },
-    } satisfies VerificationDecision;
+  const proofValidation = validateProofInput({
+    proofText,
+    proofType,
+    proofRequired,
+    questType,
+  });
+
+  if (proofValidation) {
+    return proofValidation;
   }
 
   if (walletRequired && !hasWalletContext && !trimmedProof) {
@@ -107,6 +244,21 @@ function evaluateSubmission(params: {
     } satisfies VerificationDecision;
   }
 
+  if (missingConfigKeys.length > 0) {
+    return {
+      status: "pending",
+      reason: "Quest verification rules are incomplete and need project-side configuration review.",
+      flagType: "verification_config_incomplete",
+      severity: "medium",
+      metadata: {
+        questType,
+        verificationType,
+        requiredConfigKeys,
+        missingConfigKeys,
+      },
+    } satisfies VerificationDecision;
+  }
+
   if (elevatedRisk) {
     return {
       status: "pending",
@@ -118,6 +270,52 @@ function evaluateSubmission(params: {
         sybilScore,
         verificationType,
         questType,
+        requiredConfigKeys,
+      },
+    } satisfies VerificationDecision;
+  }
+
+  if (questType === "referral") {
+    return {
+      status: "pending",
+      reason: "Referral quests stay in review until referral counts and abuse signals are verified.",
+      flagType: "referral_validation_needed",
+      severity: "medium",
+      metadata: {
+        verificationType,
+        questType,
+        minimumReferrals:
+          typeof config.minimumReferrals === "number" ? config.minimumReferrals : null,
+      },
+    } satisfies VerificationDecision;
+  }
+
+  if (questType === "manual_proof") {
+    return {
+      status: "pending",
+      reason: "Manual proof quests route to reviewer approval by design.",
+      metadata: {
+        verificationType,
+        questType,
+      },
+    } satisfies VerificationDecision;
+  }
+
+  if (
+    questType === "social_comment" &&
+    proofType === "url" &&
+    trimmedProof &&
+    !/(x\.com|twitter\.com)/i.test(trimmedProof)
+  ) {
+    return {
+      status: "rejected",
+      reason: "Comment proof must link to an X or Twitter URL.",
+      flagType: "invalid_proof_format",
+      severity: "low",
+      metadata: {
+        verificationType,
+        questType,
+        proofPreview: trimmedProof.slice(0, 120),
       },
     } satisfies VerificationDecision;
   }
@@ -128,25 +326,31 @@ function evaluateSubmission(params: {
       verificationType === "bot_check" ||
       verificationType === "event_check") &&
       !proofRequired) ||
-    (verificationType === "onchain_check" && hasWalletContext);
+    (verificationType === "onchain_check" &&
+      hasWalletContext &&
+      missingConfigKeys.length === 0);
 
   if (autoVerifiable) {
     return {
       status: "approved",
-      reason: "Submission met low-risk auto-verification rules.",
+      reason: "Submission met explicit low-risk verification rules.",
       metadata: {
         verificationType,
         questType,
+        automationRoute: "rule_auto_approved",
+        requiredConfigKeys,
       },
     } satisfies VerificationDecision;
   }
 
   return {
     status: "pending",
-    reason: "Submission requires manual or hybrid review.",
+    reason: "Submission requires manual or hybrid review based on its verification rules.",
     metadata: {
       verificationType,
       questType,
+      automationRoute: verificationType === "hybrid" ? "hybrid_review" : "manual_review",
+      requiredConfigKeys,
     },
   } satisfies VerificationDecision;
 }
@@ -452,7 +656,7 @@ export function useActionSync() {
           supabase
             .from("quests")
             .select(
-              "id, project_id, title, quest_type, proof_required, proof_type, auto_approve, verification_type"
+              "id, project_id, title, quest_type, proof_required, proof_type, auto_approve, verification_type, verification_config"
             )
             .in("id", pendingQuestIds),
           supabase

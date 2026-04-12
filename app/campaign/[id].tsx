@@ -12,6 +12,7 @@ import PrimaryButton from "@/components/PrimaryButton";
 import CampaignCompleteToast from "@/components/CampaignCompleteToast";
 import QuestCard from "@/components/QuestCard";
 import LiveScreenState from "@/components/LiveScreenState";
+import DiscoveryCampaignCard from "@/components/DiscoveryCampaignCard";
 
 import { useAppState } from "@/hooks/useAppState";
 import { useLiveAppData } from "@/hooks/useLiveAppData";
@@ -21,7 +22,7 @@ export default function CampaignDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentXp, profile, getCampaignProgress, isCampaignCompleted, streakCount } =
     useAppState();
-  const { campaigns, quests, raids, rewards, leaderboard, loading, error } =
+  const { campaigns, quests, raids, rewards, leaderboard, rankedCampaigns, loading, error } =
     useLiveAppData();
 
   const [showCompleted, setShowCompleted] = useState(false);
@@ -43,6 +44,17 @@ export default function CampaignDetailScreen() {
     const linked = rewards.filter((reward) => reward.campaignId === (id || ""));
     return linked.length > 0 ? linked : rewards.slice(0, 3);
   }, [rewards, id]);
+  const relatedRecommendations = useMemo(
+    () =>
+      rankedCampaigns
+        .filter(
+          (item) =>
+            item.id !== (id || "") &&
+            (item.communityId === campaign?.communityId || item.joinedCommunity)
+        )
+        .slice(0, 3),
+    [rankedCampaigns, id, campaign?.communityId]
+  );
 
   const liveProgress = getCampaignProgress(id || "");
   const completed = isCampaignCompleted(id || "");
@@ -157,6 +169,22 @@ export default function CampaignDetailScreen() {
             <Text style={styles.rewardDescription}>{reward.description}</Text>
           </View>
         ))}
+
+        {relatedRecommendations.length > 0 ? (
+          <>
+            <SectionTitle
+              title="You may also like"
+              subtitle="Strong next campaigns once you finish or pause this one"
+            />
+            {relatedRecommendations.map((item) => (
+              <DiscoveryCampaignCard
+                key={item.id}
+                item={item}
+                badgeLabel={item.joinedCommunity ? "Next up" : "Explore"}
+              />
+            ))}
+          </>
+        ) : null}
 
         <SectionTitle
           title="Top Raiders"

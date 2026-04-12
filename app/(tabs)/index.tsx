@@ -14,6 +14,7 @@ import GlowCard from "@/components/GlowCard";
 import LevelUpBurst from "@/components/LevelUpBurst";
 import BadgeUnlockToast from "@/components/BadgeUnlockToast";
 import LiveScreenState from "@/components/LiveScreenState";
+import DiscoveryCampaignCard from "@/components/DiscoveryCampaignCard";
 
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
@@ -36,6 +37,9 @@ export default function HomeScreen() {
     rewards,
     badges,
     unlockedBadgeIds,
+    trendingCampaigns,
+    recommendedCampaigns,
+    discoveredCommunities,
     loading,
     error,
   } = useLiveAppData();
@@ -68,9 +72,8 @@ export default function HomeScreen() {
   }, [unlockedBadgeIds]);
 
   const filteredCommunities = useMemo(() => {
-    const withJoined = communities.map((item) => ({
+    const withJoined = discoveredCommunities.map((item) => ({
       ...item,
-      joined: joinedCommunityIds.includes(item.id),
     }));
 
     if (!query.trim()) return withJoined;
@@ -78,7 +81,7 @@ export default function HomeScreen() {
     return withJoined.filter((item) =>
       item.name.toLowerCase().includes(query.toLowerCase())
     );
-  }, [communities, query, joinedCommunityIds]);
+  }, [discoveredCommunities, query]);
 
   const featuredReward = useMemo(() => {
     const available = rewards.filter((reward) => !claimedRewardIds.includes(reward.id));
@@ -158,6 +161,22 @@ export default function HomeScreen() {
       ) : null}
 
       <SectionTitle
+        title="Trending campaigns"
+        subtitle="High-signal missions with live momentum"
+      />
+      {trendingCampaigns.map((item) => (
+        <DiscoveryCampaignCard key={item.id} item={item} badgeLabel="Trending" />
+      ))}
+
+      <SectionTitle
+        title="Picked for you"
+        subtitle="Recommended next moves based on your communities and progression"
+      />
+      {recommendedCampaigns.map((item) => (
+        <DiscoveryCampaignCard key={item.id} item={item} badgeLabel="Recommended" />
+      ))}
+
+      <SectionTitle
         title="Active raids"
         subtitle="Live campaigns your community can push now"
       />
@@ -178,7 +197,10 @@ export default function HomeScreen() {
       />
 
       {filteredCommunities.map((item) => (
-        <CommunityCard key={item.id} item={item} />
+        <View key={item.id} style={styles.communityWrap}>
+          <CommunityCard item={item} />
+          <Text style={styles.discoveryReason}>{item.reason}</Text>
+        </View>
       ))}
 
       {showLevelUp && (
@@ -350,5 +372,15 @@ const styles = StyleSheet.create({
     color: COLORS.subtext,
     fontSize: 13,
     marginTop: 6,
+  },
+  communityWrap: {
+    gap: 8,
+  },
+  discoveryReason: {
+    color: COLORS.subtext,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -4,
+    paddingHorizontal: 2,
   },
 });

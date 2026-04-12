@@ -8,6 +8,7 @@ import PrimaryButton from "@/components/PrimaryButton";
 import ProgressBar from "@/components/ProgressBar";
 import LeaderboardRow from "@/components/LeaderboardRow";
 import LiveScreenState from "@/components/LiveScreenState";
+import DiscoveryCampaignCard from "@/components/DiscoveryCampaignCard";
 
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
@@ -16,7 +17,15 @@ import { useLiveAppData } from "@/hooks/useLiveAppData";
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { joinedCommunityIds, joinCommunity } = useAppState();
-  const { communities, campaigns, leaderboard, projectReputation, loading, error } = useLiveAppData();
+  const {
+    communities,
+    campaigns,
+    leaderboard,
+    projectReputation,
+    rankedCampaigns,
+    loading,
+    error,
+  } = useLiveAppData();
 
   const community = communities.find((item) => item.id === (id || ""));
   const communityCampaigns = useMemo(
@@ -43,6 +52,9 @@ export default function CommunityDetailScreen() {
     rank: index + 1,
     title: `Level ${item.level}`,
   }));
+  const nextBestCampaigns = rankedCampaigns
+    .filter((item) => item.communityId === currentCommunity?.id)
+    .slice(0, 2);
 
   function handleJoin() {
     joinCommunity(currentCommunity.id);
@@ -170,6 +182,22 @@ export default function CommunityDetailScreen() {
             <ProgressBar progress={campaign.progress} />
           </Pressable>
         ))}
+
+        {nextBestCampaigns.length > 0 ? (
+          <>
+            <SectionTitle
+              title="Best next move"
+              subtitle="The strongest campaign paths inside this community right now"
+            />
+            {nextBestCampaigns.map((item) => (
+              <DiscoveryCampaignCard
+                key={item.id}
+                item={item}
+                badgeLabel={item.joinedCommunity ? "Momentum" : "Start here"}
+              />
+            ))}
+          </>
+        ) : null}
 
         <SectionTitle
           title="Community leaderboard"

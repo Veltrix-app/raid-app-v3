@@ -1,9 +1,12 @@
 import { useEffect } from "react";
+import { buildCampaignDiscovery, buildCommunityDiscovery } from "@/lib/discovery";
 import { useLiveAppStore } from "@/store/useLiveAppStore";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppState } from "@/hooks/useAppState";
 
 export function useLiveAppData() {
   const { authUserId } = useAuth();
+  const { joinedCommunityIds, campaignProgressMap, completedCampaignIds } = useAppState();
 
   const leaderboard = useLiveAppStore((s) => s.leaderboard);
   const raids = useLiveAppStore((s) => s.raids);
@@ -22,6 +25,30 @@ export function useLiveAppData() {
     loadAll();
   }, [authUserId]);
 
+  const campaignDiscovery = buildCampaignDiscovery({
+    communities,
+    campaigns,
+    quests,
+    rewards,
+    raids,
+    projectReputation,
+    joinedCommunityIds,
+    campaignProgressMap,
+    completedCampaignIds,
+  });
+
+  const communityDiscovery = buildCommunityDiscovery({
+    communities,
+    campaigns,
+    quests,
+    rewards,
+    raids,
+    projectReputation,
+    joinedCommunityIds,
+    campaignProgressMap,
+    completedCampaignIds,
+  });
+
   return {
     leaderboard,
     raids,
@@ -32,6 +59,11 @@ export function useLiveAppData() {
     badges,
     unlockedBadgeIds,
     projectReputation,
+    trendingCampaigns: campaignDiscovery.trendingCampaigns,
+    recommendedCampaigns: campaignDiscovery.recommendedCampaigns,
+    highRewardCampaigns: campaignDiscovery.highRewardCampaigns,
+    rankedCampaigns: campaignDiscovery.rankedCampaigns,
+    discoveredCommunities: communityDiscovery,
     loading,
     error,
     reloadAll: loadAll,

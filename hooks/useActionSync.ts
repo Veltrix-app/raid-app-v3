@@ -30,6 +30,16 @@ type DuplicateSignal = {
   metadata: Record<string, unknown>;
 };
 
+type RewardVerificationRow = {
+  id: string;
+  project_id: string | null;
+  campaign_id: string | null;
+  title: string;
+  reward_type: string | null;
+  claim_method: string | null;
+  cost: number;
+};
+
 function evaluateSubmission(params: {
   quest: VerificationQuestRow;
   proofText: string;
@@ -253,16 +263,102 @@ export function useActionSync() {
     if (!session || !authUserId) return;
 
     async function syncRewards() {
+      const currentAuthUserId = authUserId;
+      if (!currentAuthUserId) return;
+
+      const unsyncedRewardIds = claimedRewards.filter(
+        (rewardId) => !syncedRewardsRef.current.has(rewardId)
+      );
+      if (!unsyncedRewardIds.length) return;
+
+      const { data: rewardRows, error: rewardLookupError } = await supabase
+        .from("rewards")
+        .select("id, project_id, campaign_id, title, reward_type, claim_method, cost")
+        .in("id", unsyncedRewardIds);
+
+      if (rewardLookupError) {
+        console.error("Reward verification load failed:", rewardLookupError.message);
+        return;
+      }
+
+      const rewardsById = new Map(
+        ((rewardRows ?? []) as RewardVerificationRow[]).map((row) => [row.id, row])
+      );
+
       for (const rewardId of claimedRewards) {
         if (syncedRewardsRef.current.has(rewardId)) continue;
 
-        const { error } = await supabase.from("reward_claims").insert({
-          auth_user_id: authUserId,
+        const reward = rewardsById.get(rewardId);
+        const { data: insertedClaim, error } = await supabase
+          .from("reward_claims")
+          .insert({
+          auth_user_id: currentAuthUserId,
           reward_id: rewardId,
-        });
+          })
+          .select("id")
+          .single();
 
         if (!error) {
           syncedRewardsRef.current.add(rewardId);
+
+          const isHighValue = (reward?.cost ?? 0) >= 500;
+          const needsManualFulfillment = reward?.claim_method === "manual_fulfillment";
+          const flaggedUser = profile?.status === "flagged" || (profile?.sybilScore ?? 0) >= 70;
+
+          const flagsToInsert = [
+            ...(isHighValue && insertedClaim?.id
+              ? [
+                  {
+                    auth_user_id: currentAuthUserId,
+                    project_id: reward?.project_id ?? null,
+                    source_table: "reward_claims",
+                    source_id: insertedClaim.id,
+                    flag_type: "high_value_claim",
+                    severity: (reward?.cost ?? 0) >= 1000 ? "high" : "medium",
+                    status: "open",
+                    reason: "High-value reward claim routed to review before fulfillment.",
+                    metadata: {
+                      rewardId,
+                      rewardTitle: reward?.title ?? "Unknown Reward",
+                      rewardCost: reward?.cost ?? 0,
+                      rewardType: reward?.reward_type ?? "custom",
+                      campaignId: reward?.campaign_id ?? null,
+                    },
+                  },
+                ]
+              : []),
+            ...(needsManualFulfillment && flaggedUser && insertedClaim?.id
+              ? [
+                  {
+                    auth_user_id: currentAuthUserId,
+                    project_id: reward?.project_id ?? null,
+                    source_table: "reward_claims",
+                    source_id: insertedClaim.id,
+                    flag_type: "risky_manual_claim",
+                    severity: "high",
+                    status: "open",
+                    reason: "Manual fulfillment claim came from a flagged or elevated-risk user.",
+                    metadata: {
+                      rewardId,
+                      rewardTitle: reward?.title ?? "Unknown Reward",
+                      claimMethod: reward?.claim_method ?? "manual_fulfillment",
+                      sybilScore: profile?.sybilScore ?? 0,
+                      trustScore: profile?.trustScore ?? 50,
+                    },
+                  },
+                ]
+              : []),
+          ];
+
+          if (flagsToInsert.length > 0) {
+            const { error: flagError } = await supabase
+              .from("review_flags")
+              .insert(flagsToInsert);
+
+            if (flagError) {
+              console.error("Reward review flag creation failed:", flagError.message);
+            }
+          }
         } else {
           console.error("Reward sync failed:", error.message);
         }
@@ -270,7 +366,7 @@ export function useActionSync() {
     }
 
     syncRewards();
-  }, [session, authUserId, claimedRewards]);
+  }, [session, authUserId, claimedRewards, profile]);
 
   useEffect(() => {
     if (!session || !authUserId) return;

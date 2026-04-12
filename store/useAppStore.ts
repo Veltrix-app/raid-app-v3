@@ -63,6 +63,7 @@ type AppState = {
 
   submitQuest: (id: string, proof?: string) => void;
   approveQuestPrototype: (id: string) => void;
+  setQuestReviewOutcome: (id: string, status: QuestStatus) => void;
 
   connectWallet: () => void;
   signIn: () => void;
@@ -648,6 +649,42 @@ export const useAppStore = create<AppState>()(
             notificationsFeed: feed,
           };
         }),
+
+      setQuestReviewOutcome: (id, status) => {
+        if (status === "approved") {
+          get().approveQuestPrototype(id);
+          return;
+        }
+
+        set((state) => {
+          if (state.questStatuses[id] === status) {
+            return state;
+          }
+
+          if (status === "pending") {
+            return {
+              questStatuses: {
+                ...state.questStatuses,
+                [id]: "pending",
+              },
+            };
+          }
+
+          return {
+            questStatuses: {
+              ...state.questStatuses,
+              [id]: "rejected",
+            },
+            unreadCount: state.unreadCount + 1,
+            notificationsFeed: addNotification(
+              state.notificationsFeed,
+              "Quest rejected",
+              "This submission needs changes before it can be approved.",
+              "quest"
+            ),
+          };
+        });
+      },
 
       connectWallet: () =>
         set((state) => ({

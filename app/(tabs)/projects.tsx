@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import Screen from "@/components/Screen";
@@ -77,6 +77,29 @@ export default function ProjectsScreen() {
     (campaign) => campaign.communityId === topProject?.id
   ).length;
 
+  const spotlightContent = topProject ? (
+    <>
+      <View style={styles.heroGlow} />
+      <View style={styles.heroOverlay} />
+      <Text style={styles.heroLabel}>Public profile spotlight</Text>
+      <Text style={styles.heroTitle}>{topProject.name}</Text>
+      <Text style={styles.heroText}>
+        {topProject.longDescription || topProject.description}
+      </Text>
+
+      <View style={styles.heroStats}>
+        <View style={styles.heroStat}>
+          <Text style={styles.heroStatLabel}>Members</Text>
+          <Text style={styles.heroStatValue}>{topProject.members.toLocaleString()}</Text>
+        </View>
+        <View style={styles.heroStat}>
+          <Text style={styles.heroStatLabel}>Campaigns</Text>
+          <Text style={styles.heroStatValue}>{topProjectCampaignCount}</Text>
+        </View>
+      </View>
+    </>
+  ) : null;
+
   return (
     <Screen>
       <SectionTitle
@@ -88,7 +111,6 @@ export default function ProjectsScreen() {
 
       {topProject ? (
         <Pressable
-          style={styles.hero}
           onPress={() =>
             router.push({
               pathname: "/project/[id]",
@@ -96,23 +118,17 @@ export default function ProjectsScreen() {
             })
           }
         >
-          <View style={styles.heroGlow} />
-          <Text style={styles.heroLabel}>Public profile spotlight</Text>
-          <Text style={styles.heroTitle}>{topProject.name}</Text>
-          <Text style={styles.heroText}>
-            {topProject.longDescription || topProject.description}
-          </Text>
-
-          <View style={styles.heroStats}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatLabel}>Members</Text>
-              <Text style={styles.heroStatValue}>{topProject.members.toLocaleString()}</Text>
-            </View>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatLabel}>Campaigns</Text>
-              <Text style={styles.heroStatValue}>{topProjectCampaignCount}</Text>
-            </View>
-          </View>
+          {topProject.bannerUrl ? (
+            <ImageBackground
+              source={{ uri: topProject.bannerUrl }}
+              style={styles.hero}
+              imageStyle={styles.heroImage}
+            >
+              {spotlightContent}
+            </ImageBackground>
+          ) : (
+            <View style={styles.hero}>{spotlightContent}</View>
+          )}
         </Pressable>
       ) : null}
 
@@ -164,6 +180,13 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 999,
     backgroundColor: "rgba(198,255,0,0.12)",
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(5,7,11,0.58)",
+  },
+  heroImage: {
+    borderRadius: RADIUS.xl,
   },
   heroLabel: {
     color: COLORS.primary,

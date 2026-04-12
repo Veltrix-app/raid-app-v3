@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 
@@ -69,6 +69,56 @@ export default function ProjectDetailScreen() {
     }
   }
 
+  const heroContent = (
+    <>
+      <View style={styles.heroGlow} />
+      <View style={styles.heroOverlay} />
+      <View style={styles.heroHeader}>
+        <View style={styles.logoWrap}>
+          <Text style={styles.logoText}>{currentProject.logo || currentProject.name.slice(0, 1)}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name}>{currentProject.name}</Text>
+          <Text style={styles.meta}>
+            {(currentProject.chain || "Project")}
+            {currentProject.category ? ` | ${currentProject.category}` : ""} | {currentProject.members.toLocaleString()} members
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.desc}>{currentProject.description}</Text>
+
+      <View style={styles.storyPills}>
+        {currentProject.chain ? <StoryPill label={currentProject.chain} /> : null}
+        {currentProject.category ? <StoryPill label={currentProject.category} /> : null}
+        <StoryPill label={joined ? "Joined" : "Public"} />
+        {currentProject.website ? <StoryPill label="Website connected" /> : null}
+      </View>
+
+      <View style={styles.stats}>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Live campaigns</Text>
+          <Text style={styles.statValue}>{projectCampaigns.length}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Highlighted rewards</Text>
+          <Text style={styles.statValue}>{highlightedRewards.length}</Text>
+        </View>
+      </View>
+
+      <PrimaryButton
+        title={joined ? "Joined to project" : "Join project"}
+        onPress={() => joinCommunity(project.id)}
+      />
+
+      {currentProject.website ? (
+        <Pressable style={styles.secondaryButton} onPress={openWebsite}>
+          <Text style={styles.secondaryButtonText}>Open website</Text>
+        </Pressable>
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <Stack.Screen
@@ -83,57 +133,24 @@ export default function ProjectDetailScreen() {
       <Screen>
         <LiveScreenState loading={loading} error={error} />
 
-        <LinearGradient
-          colors={["#0B0D12", "#112117", "#13261D"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <View style={styles.heroGlow} />
-          <View style={styles.heroHeader}>
-            <View style={styles.logoWrap}>
-              <Text style={styles.logoText}>{currentProject.logo || currentProject.name.slice(0, 1)}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{currentProject.name}</Text>
-              <Text style={styles.meta}>
-                {(currentProject.chain || "Project")}
-                {currentProject.category ? ` | ${currentProject.category}` : ""} | {currentProject.members.toLocaleString()} members
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.desc}>{currentProject.description}</Text>
-
-          <View style={styles.storyPills}>
-            {currentProject.chain ? <StoryPill label={currentProject.chain} /> : null}
-            {currentProject.category ? <StoryPill label={currentProject.category} /> : null}
-            <StoryPill label={joined ? "Joined" : "Public"} />
-            {currentProject.website ? <StoryPill label="Website connected" /> : null}
-          </View>
-
-          <View style={styles.stats}>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Live campaigns</Text>
-              <Text style={styles.statValue}>{projectCampaigns.length}</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Highlighted rewards</Text>
-              <Text style={styles.statValue}>{highlightedRewards.length}</Text>
-            </View>
-          </View>
-
-          <PrimaryButton
-            title={joined ? "Joined to project" : "Join project"}
-            onPress={() => joinCommunity(project.id)}
-          />
-
-          {currentProject.website ? (
-            <Pressable style={styles.secondaryButton} onPress={openWebsite}>
-              <Text style={styles.secondaryButtonText}>Open website</Text>
-            </Pressable>
-          ) : null}
-        </LinearGradient>
+        {currentProject.bannerUrl ? (
+          <ImageBackground
+            source={{ uri: currentProject.bannerUrl }}
+            style={styles.hero}
+            imageStyle={styles.heroImage}
+          >
+            {heroContent}
+          </ImageBackground>
+        ) : (
+          <LinearGradient
+            colors={["#0B0D12", "#112117", "#13261D"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            {heroContent}
+          </LinearGradient>
+        )}
 
         <View style={styles.storyCard}>
           <Text style={styles.storyEyebrow}>Public Profile</Text>
@@ -280,6 +297,13 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 999,
     backgroundColor: "rgba(198,255,0,0.12)",
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(5,7,11,0.62)",
+  },
+  heroImage: {
+    borderRadius: RADIUS.xl,
   },
   heroHeader: {
     flexDirection: "row",

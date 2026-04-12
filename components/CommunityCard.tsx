@@ -15,11 +15,15 @@ export default function CommunityCard({ item }: Props) {
 
   return (
     <Pressable style={[styles.card, joined && styles.cardJoined]} onPress={() => router.push(`/community/${item.id}`)}>
-      <View style={styles.row}>
+      <View style={styles.hero}>
+        <View style={styles.logoWrap}>
+          <Text style={styles.logoText}>{item.logo || item.name.slice(0, 1)}</Text>
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.meta}>{item.members.toLocaleString()} members</Text>
-          <Text style={styles.desc}>{item.description}</Text>
+          <Text style={styles.meta}>
+            {(item.chain || "Community")}{item.category ? ` | ${item.category}` : ""} | {item.members.toLocaleString()} members
+          </Text>
         </View>
 
         <View style={[styles.badge, joined && styles.badgeJoined]}>
@@ -29,9 +33,20 @@ export default function CommunityCard({ item }: Props) {
         </View>
       </View>
 
-      <View style={styles.pool}>
-        <Text style={styles.poolLabel}>Reward pool</Text>
-        <Text style={styles.poolValue}>{item.rewardPool}</Text>
+      <View style={styles.row}>
+        <Text style={styles.desc}>{item.description}</Text>
+      </View>
+
+      <View style={styles.pillsRow}>
+        <View style={styles.poolPill}>
+          <Text style={styles.poolLabel}>Reward pool</Text>
+          <Text style={styles.poolValue}>{item.rewardPool}</Text>
+        </View>
+        {item.website ? (
+          <View style={styles.linkPill}>
+            <Text style={styles.linkPillText}>Website connected</Text>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -55,9 +70,28 @@ const styles = StyleSheet.create({
   cardJoined: {
     borderColor: COLORS.borderStrong,
   },
-  row: {
+  hero: {
     flexDirection: "row",
     gap: SPACING.md,
+    alignItems: "flex-start",
+  },
+  row: {
+    gap: SPACING.sm,
+  },
+  logoWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card2,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+  },
+  logoText: {
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: "800",
   },
   name: {
     color: COLORS.text,
@@ -72,7 +106,6 @@ const styles = StyleSheet.create({
   desc: {
     color: COLORS.subtext,
     fontSize: 13,
-    marginTop: 8,
     lineHeight: 18,
   },
   badge: {
@@ -96,10 +129,32 @@ const styles = StyleSheet.create({
   badgeTextJoined: {
     color: COLORS.primary,
   },
-  pool: {
+  pillsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  poolPill: {
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.card2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  linkPill: {
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(198,255,0,0.10)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "rgba(198,255,0,0.25)",
+  },
+  linkPillText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
   },
   poolLabel: {
     color: COLORS.subtext,
@@ -109,5 +164,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 14,
     fontWeight: "800",
+    marginTop: 4,
   },
 });

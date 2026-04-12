@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 
 import Screen from "@/components/Screen";
@@ -44,16 +45,14 @@ export default function CommunityDetailScreen() {
 
   const currentCommunity = community;
   const joined = joinedCommunityIds.includes(currentCommunity.id);
-  const communityReputation = projectReputation.find(
-    (item) => item.projectId === currentCommunity.id
-  );
+  const communityReputation = projectReputation.find((item) => item.projectId === currentCommunity.id);
   const communityLeaders = leaderboard.map((item, index) => ({
     ...item,
     rank: index + 1,
     title: `Level ${item.level}`,
   }));
   const nextBestCampaigns = rankedCampaigns
-    .filter((item) => item.communityId === currentCommunity?.id)
+    .filter((item) => item.communityId === currentCommunity.id)
     .slice(0, 2);
 
   function handleJoin() {
@@ -65,7 +64,7 @@ export default function CommunityDetailScreen() {
     <>
       <Stack.Screen
         options={{
-          title: community.name,
+          title: currentCommunity.name,
           headerShown: true,
           headerTintColor: COLORS.text,
           headerStyle: { backgroundColor: COLORS.bg },
@@ -75,9 +74,27 @@ export default function CommunityDetailScreen() {
       <Screen>
         <LiveScreenState loading={loading} error={error} />
 
-        <View style={styles.hero}>
-          <Text style={styles.name}>{currentCommunity.name}</Text>
-          <Text style={styles.meta}>{currentCommunity.members.toLocaleString()} members</Text>
+        <LinearGradient
+          colors={["#0B0D12", "#10251A", "#13261D"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}
+        >
+          <View style={styles.heroGlow} />
+          <View style={styles.heroHeader}>
+            <View style={styles.logoWrap}>
+              <Text style={styles.logoText}>{currentCommunity.logo || currentCommunity.name.slice(0, 1)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{currentCommunity.name}</Text>
+              <Text style={styles.meta}>
+                {(currentCommunity.chain || "Community")}
+                {currentCommunity.category ? ` | ${currentCommunity.category}` : ""} |{" "}
+                {currentCommunity.members.toLocaleString()} members
+              </Text>
+            </View>
+          </View>
+
           <Text style={styles.desc}>{currentCommunity.description}</Text>
 
           <View style={styles.stats}>
@@ -92,10 +109,22 @@ export default function CommunityDetailScreen() {
             </View>
           </View>
 
-          <PrimaryButton
-            title={joined ? "Leave community" : "Join community"}
-            onPress={handleJoin}
-          />
+          <PrimaryButton title={joined ? "Leave community" : "Join community"} onPress={handleJoin} />
+        </LinearGradient>
+
+        <View style={styles.storyCard}>
+          <Text style={styles.storyEyebrow}>Community Story</Text>
+          <Text style={styles.storyTitle}>What this project stands for</Text>
+          <Text style={styles.storyText}>
+            {currentCommunity.longDescription ||
+              "This community uses Veltrix to run campaigns, highlight contributors and convert engagement into visible reputation."}
+          </Text>
+
+          <View style={styles.storyPills}>
+            <StoryPill label={currentCommunity.chain || "Multi-chain"} />
+            {currentCommunity.category ? <StoryPill label={currentCommunity.category} /> : null}
+            <StoryPill label={joined ? "Joined" : "Not joined"} />
+          </View>
         </View>
 
         <View style={styles.reputationCard}>
@@ -103,9 +132,7 @@ export default function CommunityDetailScreen() {
             <View>
               <Text style={styles.reputationEyebrow}>Project Reputation</Text>
               <Text style={styles.reputationTitle}>
-                {communityReputation
-                  ? communityReputation.contributionTier.toUpperCase()
-                  : "NOT STARTED"}
+                {communityReputation ? communityReputation.contributionTier.toUpperCase() : "NOT STARTED"}
               </Text>
             </View>
 
@@ -119,8 +146,8 @@ export default function CommunityDetailScreen() {
 
           <Text style={styles.reputationText}>
             {communityReputation
-              ? `Inside ${currentCommunity.name}, your reputation is tracked separately from your global Veltrix score. This is what projects can use to spot their strongest contributors.`
-              : `You have not built project-specific reputation inside ${currentCommunity.name} yet. Complete quests and raids here to start earning local trust and rank.`}
+                ? `Inside ${currentCommunity.name}, your reputation is tracked separately from your global Veltrix score.`
+                : `You have not built project-specific reputation inside ${currentCommunity.name} yet.`}
           </Text>
 
           <View style={styles.stats}>
@@ -133,33 +160,24 @@ export default function CommunityDetailScreen() {
 
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Trust</Text>
-              <Text style={styles.statValue}>
-                {communityReputation?.trustScore ?? 50}
-              </Text>
+              <Text style={styles.statValue}>{communityReputation?.trustScore ?? 50}</Text>
             </View>
           </View>
 
           <View style={styles.stats}>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Approved quests</Text>
-              <Text style={styles.statValue}>
-                {communityReputation?.questsCompleted ?? 0}
-              </Text>
+              <Text style={styles.statValue}>{communityReputation?.questsCompleted ?? 0}</Text>
             </View>
 
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Confirmed raids</Text>
-              <Text style={styles.statValue}>
-                {communityReputation?.raidsCompleted ?? 0}
-              </Text>
+              <Text style={styles.statValue}>{communityReputation?.raidsCompleted ?? 0}</Text>
             </View>
           </View>
         </View>
 
-        <SectionTitle
-          title="Active campaigns"
-          subtitle="Tap a campaign to open the mission details"
-        />
+        <SectionTitle title="Active campaigns" subtitle="Tap a campaign to open the mission details" />
 
         {communityCampaigns.map((campaign) => (
           <Pressable
@@ -170,7 +188,10 @@ export default function CommunityDetailScreen() {
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.campaignTitle}>{campaign.title}</Text>
-                <Text style={styles.campaignMeta}>{campaign.deadline}</Text>
+                <Text style={styles.campaignMeta}>
+                  {campaign.featured ? "Featured | " : ""}
+                  {campaign.visibility || "public"}
+                </Text>
               </View>
 
               <View style={styles.badge}>
@@ -199,10 +220,7 @@ export default function CommunityDetailScreen() {
           </>
         ) : null}
 
-        <SectionTitle
-          title="Community leaderboard"
-          subtitle="Top contributors inside this community"
-        />
+        <SectionTitle title="Community leaderboard" subtitle="Top contributors inside this community" />
 
         {communityLeaders.map((item) => (
           <LeaderboardRow
@@ -220,19 +238,52 @@ export default function CommunityDetailScreen() {
   );
 }
 
+function StoryPill({ label }: { label: string }) {
+  return (
+    <View style={styles.storyPill}>
+      <Text style={styles.storyPillText}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.xl,
+    borderWidth: 1,
+    borderColor: "rgba(198,255,0,0.20)",
+    gap: SPACING.md,
+    overflow: "hidden",
+    position: "relative",
+  },
+  heroGlow: {
+    position: "absolute",
+    right: -40,
+    top: -20,
+    width: 140,
+    height: 140,
+    borderRadius: 999,
+    backgroundColor: "rgba(198,255,0,0.12)",
+  },
+  heroHeader: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    alignItems: "center",
+  },
+  logoWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card2,
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
-    gap: SPACING.md,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+  },
+  logoText: {
+    color: COLORS.primary,
+    fontSize: 22,
+    fontWeight: "800",
   },
   reputationCard: {
     backgroundColor: COLORS.card,
@@ -246,6 +297,49 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
     elevation: 4,
+  },
+  storyCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: 10,
+  },
+  storyEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  storyTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  storyText: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  storyPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  storyPill: {
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.card2,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  storyPillText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "700",
   },
   reputationHeader: {
     flexDirection: "row",
@@ -301,6 +395,7 @@ const styles = StyleSheet.create({
   meta: {
     color: COLORS.subtext,
     fontSize: 13,
+    marginTop: 4,
   },
   desc: {
     color: COLORS.subtext,
@@ -351,6 +446,7 @@ const styles = StyleSheet.create({
     color: COLORS.subtext,
     fontSize: 12,
     marginTop: 4,
+    textTransform: "capitalize",
   },
   campaignDesc: {
     color: COLORS.subtext,

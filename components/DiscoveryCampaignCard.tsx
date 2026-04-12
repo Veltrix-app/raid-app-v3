@@ -16,8 +16,11 @@ export default function DiscoveryCampaignCard({ item, badgeLabel }: Props) {
       style={styles.card}
       onPress={() => router.push(`/campaign/${item.id}`)}
     >
-      <View style={styles.header}>
-        <View style={styles.headerBody}>
+      <View style={styles.topRow}>
+        <View style={styles.communityBadge}>
+          <Text style={styles.communityBadgeText}>{item.communityName.slice(0, 1)}</Text>
+        </View>
+        <View style={styles.topBody}>
           <Text style={styles.community}>{item.communityName}</Text>
           <Text style={styles.title}>{item.title}</Text>
         </View>
@@ -27,9 +30,13 @@ export default function DiscoveryCampaignCard({ item, badgeLabel }: Props) {
         </View>
       </View>
 
-      <Text style={styles.reason}>{item.reason}</Text>
+      <View style={styles.signalRow}>
+        <Text style={styles.signalLabel}>Signal</Text>
+        <Text style={styles.signalValue}>{item.reason}</Text>
+      </View>
 
-      <View style={styles.pillsRow}>
+      <View style={styles.header}>
+        <Pill label={`${item.progress}% complete`} />
         <Pill label={`${item.questCount} quests`} />
         <Pill label={`${item.rewardCount} rewards`} />
         <Pill label={item.joinedCommunity ? "Joined" : "Explore"} />
@@ -62,13 +69,34 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 5,
   },
-  header: {
+  topRow: {
     flexDirection: "row",
     gap: SPACING.md,
     alignItems: "flex-start",
   },
-  headerBody: {
+  communityBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card2,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+  },
+  communityBadgeText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  topBody: {
     flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+    alignItems: "center",
   },
   community: {
     color: COLORS.primary,
@@ -97,15 +125,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
-  reason: {
+  signalRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    alignItems: "flex-start",
+  },
+  signalLabel: {
+    color: COLORS.subtext,
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+  signalValue: {
+    flex: 1,
     color: COLORS.subtext,
     fontSize: 13,
     lineHeight: 19,
-  },
-  pillsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
   },
   pill: {
     borderRadius: RADIUS.pill,

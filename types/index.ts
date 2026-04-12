@@ -3,7 +3,13 @@ export type Community = {
   name: string;
   members: number;
   description: string;
+  longDescription?: string;
   rewardPool: string;
+  logo?: string;
+  bannerUrl?: string;
+  chain?: string;
+  category?: string;
+  website?: string;
   joined?: boolean;
 };
 
@@ -27,11 +33,17 @@ export type Quest = {
 export type Campaign = {
   id: string;
   communityId: string;
+  communityName?: string;
   title: string;
   description: string;
+  longDescription?: string;
   xp: number;
   deadline?: string;
   progress: number;
+  visibility?: string;
+  featured?: boolean;
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type Raid = {

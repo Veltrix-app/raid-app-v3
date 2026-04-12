@@ -31,7 +31,13 @@ export type LiveCommunity = {
   name: string;
   members: number;
   description: string;
+  longDescription?: string;
   rewardPool: string;
+  logo?: string;
+  bannerUrl?: string;
+  chain?: string;
+  category?: string;
+  website?: string;
   joined?: boolean;
 };
 
@@ -51,11 +57,17 @@ export type LiveProjectReputation = {
 export type LiveCampaign = {
   id: string;
   communityId: string;
+  communityName?: string;
   title: string;
   description: string;
+  longDescription?: string;
   xp: number;
   deadline?: string;
   progress: number;
+  visibility?: string;
+  featured?: boolean;
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type LiveReward = {
@@ -212,10 +224,16 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
         name: row.name ?? "Project",
         members: row.members ?? 0,
         description: row.description ?? "No description yet.",
+        longDescription: row.long_description ?? "",
         rewardPool:
           typeof row.campaigns === "number"
             ? `${row.campaigns} campaigns`
             : "Live project",
+        logo: row.logo ?? "",
+        bannerUrl: row.banner_url ?? "",
+        chain: row.chain ?? "",
+        category: row.category ?? "",
+        website: row.website ?? "",
       }));
 
       set({ communities });
@@ -234,17 +252,27 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
 
       if (error) throw error;
 
+      const communityNameMap = new Map(
+        (useLiveAppStore.getState().communities || []).map((community) => [community.id, community.name])
+      );
+
       const campaigns: LiveCampaign[] = (data || []).map((row: any) => ({
         id: row.id,
         communityId: row.project_id ?? "",
+        communityName: communityNameMap.get(row.project_id ?? "") ?? "Community",
         title: row.title ?? "Campaign",
         description:
           row.short_description ||
           row.long_description ||
           "Live campaign from backend.",
+        longDescription: row.long_description ?? "",
         xp: row.xp_budget ?? 0,
-        deadline: row.status ?? "active",
+        deadline: row.ends_at ?? row.status ?? "active",
         progress: row.completion_rate ?? 0,
+        visibility: row.visibility ?? "public",
+        featured: row.featured ?? false,
+        startsAt: row.starts_at ?? undefined,
+        endsAt: row.ends_at ?? undefined,
       }));
 
       set({ campaigns });

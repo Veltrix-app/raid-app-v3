@@ -20,15 +20,24 @@ import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 
 export default function CampaignDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { currentXp, profile, getCampaignProgress, isCampaignCompleted, streakCount } =
-    useAppState();
-  const { campaigns, quests, raids, rewards, leaderboard, rankedCampaigns, loading, error } =
-    useLiveAppData();
+  const { getCampaignProgress, isCampaignCompleted, streakCount } = useAppState();
+  const {
+    campaigns,
+    communities,
+    quests,
+    raids,
+    rewards,
+    leaderboard,
+    rankedCampaigns,
+    loading,
+    error,
+  } = useLiveAppData();
 
   const [showCompleted, setShowCompleted] = useState(false);
   const prevCompletedRef = useRef(false);
 
   const campaign = campaigns.find((item) => item.id === (id || ""));
+  const community = communities.find((item) => item.id === campaign?.communityId);
 
   const campaignQuests = useMemo(
     () => quests.filter((quest) => quest.campaignId === (id || "")),
@@ -44,6 +53,7 @@ export default function CampaignDetailScreen() {
     const linked = rewards.filter((reward) => reward.campaignId === (id || ""));
     return linked.length > 0 ? linked : rewards.slice(0, 3);
   }, [rewards, id]);
+
   const relatedRecommendations = useMemo(
     () =>
       rankedCampaigns
@@ -66,13 +76,15 @@ export default function CampaignDetailScreen() {
     prevCompletedRef.current = completed;
   }, [completed]);
 
-  const campaignLeaderboard = useMemo(() => {
-    return leaderboard.map((item, index) => ({
-      ...item,
-      rank: index + 1,
-      title: `Level ${item.level}`,
-    }));
-  }, [leaderboard]);
+  const campaignLeaderboard = useMemo(
+    () =>
+      leaderboard.map((item, index) => ({
+        ...item,
+        rank: index + 1,
+        title: `Level ${item.level}`,
+      })),
+    [leaderboard]
+  );
 
   if (!campaign) {
     return (
@@ -105,9 +117,18 @@ export default function CampaignDetailScreen() {
         >
           <View style={styles.heroGlow} />
 
-          <Text style={styles.heroLabel}>Campaign</Text>
+          <Text style={styles.heroLabel}>
+            {campaign.communityName || community?.name || "Campaign"}
+          </Text>
           <Text style={styles.heroTitle}>{campaign.title}</Text>
           <Text style={styles.heroDescription}>{campaign.description}</Text>
+
+          <View style={styles.heroPills}>
+            <HeroPill label={campaign.featured ? "Featured" : "Live"} />
+            <HeroPill label={campaign.visibility || "public"} />
+            {community?.chain ? <HeroPill label={community.chain} /> : null}
+            {community?.category ? <HeroPill label={community.category} /> : null}
+          </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
@@ -116,10 +137,8 @@ export default function CampaignDetailScreen() {
             </View>
 
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Status</Text>
-              <Text style={styles.statValue}>
-                {completed ? "Completed" : campaign.deadline}
-              </Text>
+              <Text style={styles.statLabel}>Timeline</Text>
+              <Text style={styles.statValue}>{completed ? "Completed" : campaign.deadline}</Text>
             </View>
           </View>
 
@@ -127,7 +146,7 @@ export default function CampaignDetailScreen() {
 
           <View style={styles.progressRow}>
             <Text style={styles.progressText}>{liveProgress}% complete</Text>
-            {completed ? <Text style={styles.completedText}>Reward Unlocked</Text> : null}
+            {completed ? <Text style={styles.completedText}>Reward unlocked</Text> : null}
           </View>
 
           <PrimaryButton
@@ -137,37 +156,42 @@ export default function CampaignDetailScreen() {
           />
         </LinearGradient>
 
-        <SectionTitle
-          title="Quests"
-          subtitle="Complete tasks to progress this campaign"
-        />
+        <View style={styles.storyCard}>
+          <Text style={styles.storyEyebrow}>Campaign Story</Text>
+          <Text style={styles.storyTitle}>Why this mission matters</Text>
+          <Text style={styles.storyText}>
+            {campaign.longDescription ||
+              community?.longDescription ||
+              "This campaign is part of the community's live engagement surface. Complete quests, join raids and unlock rewards to move your local reputation forward."}
+          </Text>
+        </View>
+
+        <SectionTitle title="Quests" subtitle="Complete tasks to progress this campaign" />
         {campaignQuests.map((quest) => (
           <QuestCard key={quest.id} item={quest} />
         ))}
 
-        <SectionTitle
-          title="Live Raids"
-          subtitle="Join coordinated pushes tied to this campaign"
-        />
+        <SectionTitle title="Live raids" subtitle="Join coordinated pushes tied to this campaign" />
         {campaignRaids.map((raid) => (
           <RaidCard key={raid.id} item={raid} />
         ))}
 
-        <SectionTitle
-          title="Campaign Rewards"
-          subtitle="Rewards linked to this campaign"
-        />
+        <SectionTitle title="Campaign rewards" subtitle="Rewards linked to this campaign" />
         {campaignRewards.map((reward) => (
-          <View key={reward.id} style={styles.rewardCard}>
+          <Pressable
+            key={reward.id}
+            style={styles.rewardCard}
+            onPress={() => router.push("/(tabs)/rewards")}
+          >
             <View style={styles.rowBetween}>
               <Text style={styles.rewardTitle}>{reward.title}</Text>
               <Text style={styles.rewardCost}>{reward.cost} XP</Text>
             </View>
             <Text style={styles.rewardMeta}>
-              {reward.type} • {reward.rarity || "common"}
+              {reward.type} | {reward.rarity || "common"}
             </Text>
             <Text style={styles.rewardDescription}>{reward.description}</Text>
-          </View>
+          </Pressable>
         ))}
 
         {relatedRecommendations.length > 0 ? (
@@ -186,10 +210,7 @@ export default function CampaignDetailScreen() {
           </>
         ) : null}
 
-        <SectionTitle
-          title="Top Raiders"
-          subtitle="Current leaderboard inside this campaign"
-        />
+        <SectionTitle title="Top raiders" subtitle="Current leaderboard inside this campaign" />
         {campaignLeaderboard.map((item) => (
           <LeaderboardRow
             key={item.id}
@@ -203,10 +224,7 @@ export default function CampaignDetailScreen() {
           />
         ))}
 
-        <Pressable
-          style={styles.linkButton}
-          onPress={() => router.push("/(tabs)/campaigns")}
-        >
+        <Pressable style={styles.linkButton} onPress={() => router.push("/(tabs)/campaigns")}>
           <Text style={styles.linkButtonText}>Back to campaigns</Text>
         </Pressable>
 
@@ -219,6 +237,14 @@ export default function CampaignDetailScreen() {
         )}
       </Screen>
     </>
+  );
+}
+
+function HeroPill({ label }: { label: string }) {
+  return (
+    <View style={styles.heroPill}>
+      <Text style={styles.heroPillText}>{label}</Text>
+    </View>
   );
 }
 
@@ -263,6 +289,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  heroPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
+  heroPill: {
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  heroPillText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
   statsRow: {
     flexDirection: "row",
     gap: SPACING.md,
@@ -298,6 +343,31 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontSize: 12,
     fontWeight: "800",
+  },
+  storyCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: 10,
+  },
+  storyEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  storyTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  storyText: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 20,
   },
   rewardCard: {
     backgroundColor: COLORS.card,

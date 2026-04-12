@@ -11,5 +11,12 @@ export type AppUserProfile = {
   xp: number;
   level: number;
   streak: number;
+  trustScore: number;
+  sybilScore: number;
+  contributionTier: string;
+  reputationRank: number;
+  questsCompleted: number;
+  raidsCompleted: number;
+  rewardsClaimed: number;
   status: "active" | "flagged";
 };

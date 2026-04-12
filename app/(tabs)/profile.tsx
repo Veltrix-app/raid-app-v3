@@ -52,6 +52,13 @@ export default function ProfileScreen() {
   const title = profile?.title || "Elite Raider";
   const faction = profile?.faction || "Neon Wolves";
   const bio = profile?.bio || "No bio set yet.";
+  const contributionTier = profile?.contributionTier || "explorer";
+  const trustScore = profile?.trustScore ?? 50;
+  const sybilScore = profile?.sybilScore ?? 0;
+  const reputationRank = profile?.reputationRank ?? 0;
+  const questsCompleted = profile?.questsCompleted ?? completedQuestCount;
+  const raidsCompleted = profile?.raidsCompleted ?? confirmedRaidCount;
+  const rewardsClaimed = profile?.rewardsClaimed ?? claimCount;
   const walletText =
     walletConnected
       ? profile?.wallet || "Wallet connected"
@@ -103,14 +110,41 @@ export default function ProfileScreen() {
         onPress={() => router.push("/profile/edit")}
       />
 
+      <View style={styles.reputationCard}>
+        <View style={styles.reputationHeader}>
+          <View>
+            <Text style={styles.reputationEyebrow}>Veltrix Reputation</Text>
+            <Text style={styles.reputationTitle}>
+              {contributionTier.toUpperCase()}
+            </Text>
+          </View>
+
+          <View style={styles.rankPill}>
+            <Text style={styles.rankLabel}>Rank</Text>
+            <Text style={styles.rankValue}>
+              {reputationRank > 0 ? `#${reputationRank}` : "-"}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.reputationText}>
+          Trust and quality signals follow your activity across quests, raids and claims. This is the first layer of your portable Veltrix identity.
+        </Text>
+
+        <View style={styles.row}>
+          <StatCard label="Trust score" value={trustScore} />
+          <StatCard label="Sybil risk" value={sybilScore} />
+        </View>
+      </View>
+
       <View style={styles.row}>
-        <StatCard label="Approved quests" value={String(completedQuestCount)} />
-        <StatCard label="Confirmed raids" value={String(confirmedRaidCount)} />
+        <StatCard label="Approved quests" value={String(questsCompleted)} />
+        <StatCard label="Confirmed raids" value={String(raidsCompleted)} />
       </View>
 
       <View style={styles.row}>
         <StatCard label="Communities" value={String(joinedCommunityCount)} />
-        <StatCard label="Claimed rewards" value={String(claimCount)} />
+        <StatCard label="Claimed rewards" value={String(rewardsClaimed)} />
       </View>
 
       <View style={styles.row}>
@@ -234,6 +268,65 @@ const styles = StyleSheet.create({
     color: COLORS.subtext,
     fontSize: 14,
     lineHeight: 20,
+  },
+  reputationCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: 12,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  reputationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
+  reputationEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  reputationTitle: {
+    color: COLORS.text,
+    fontSize: 24,
+    fontWeight: "800",
+    marginTop: 6,
+  },
+  reputationText: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  rankPill: {
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    backgroundColor: COLORS.card2,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    alignItems: "flex-end",
+  },
+  rankLabel: {
+    color: COLORS.subtext,
+    fontSize: 11,
+    textTransform: "uppercase",
+    fontWeight: "700",
+    letterSpacing: 0.6,
+  },
+  rankValue: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 4,
   },
   wallet: {
     color: COLORS.subtext,

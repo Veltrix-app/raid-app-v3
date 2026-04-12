@@ -43,7 +43,46 @@ function mapProfile(row: any): AppUserProfile {
     xp: row.xp ?? 0,
     level: row.level ?? 1,
     streak: row.streak ?? 0,
+    trustScore: row.user_global_reputation?.trust_score ?? 50,
+    sybilScore: row.user_global_reputation?.sybil_score ?? 0,
+    contributionTier: row.user_global_reputation?.contribution_tier ?? "explorer",
+    reputationRank: row.user_global_reputation?.reputation_rank ?? 0,
+    questsCompleted: row.user_global_reputation?.quests_completed ?? 0,
+    raidsCompleted: row.user_global_reputation?.raids_completed ?? 0,
+    rewardsClaimed: row.user_global_reputation?.rewards_claimed ?? 0,
     status: row.status ?? "active",
+  };
+}
+
+async function fetchProfileWithReputation(authUserId: string) {
+  const [{ data: profile, error: profileError }, { data: reputation, error: reputationError }] =
+    await Promise.all([
+      supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("auth_user_id", authUserId)
+        .single(),
+      supabase
+        .from("user_global_reputation")
+        .select("*")
+        .eq("auth_user_id", authUserId)
+        .maybeSingle(),
+    ]);
+
+  if (profileError) {
+    return { data: null, error: profileError };
+  }
+
+  if (reputationError) {
+    return { data: null, error: reputationError };
+  }
+
+  return {
+    data: {
+      ...profile,
+      user_global_reputation: reputation,
+    },
+    error: null,
   };
 }
 
@@ -131,6 +170,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       streak: 0,
       status: "active",
     });
+
+    const { error: reputationError } = await supabase
+      .from("user_global_reputation")
+      .upsert({
+        auth_user_id: authUserId,
+        total_xp: 0,
+        level: 1,
+        streak: 0,
+        trust_score: 50,
+        sybil_score: 0,
+        contribution_tier: "explorer",
+        reputation_rank: 0,
+        quests_completed: 0,
+        raids_completed: 0,
+        rewards_claimed: 0,
+        status: "active",
+      });
     
     const { error: progressError } = await supabase.from("user_progress").insert({
       auth_user_id: authUserId,
@@ -150,6 +206,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (profileError) {
       set({ loading: false, error: profileError.message });
       return { ok: false, error: profileError.message };
+    }
+
+    if (reputationError) {
+      set({ loading: false, error: reputationError.message });
+      return { ok: false, error: reputationError.message };
     }
 
     const {
@@ -207,11 +268,7 @@ signOut: async () => {
     const authUserId = get().authUserId;
     if (!authUserId) return;
 
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("auth_user_id", authUserId)
-      .single();
+    const { data, error } = await fetchProfileWithReputation(authUserId);
 
     if (error) {
       set({ error: error.message, profile: null });
@@ -253,7 +310,16 @@ signOut: async () => {
       return { ok: false, error: error.message };
     }
 
-    set({ profile: mapProfile(data) });
+    const { data: combinedData, error: combinedError } = await fetchProfileWithReputation(
+      authUserId
+    );
+
+    if (combinedError) {
+      set({ error: combinedError.message, profile: mapProfile(data) });
+      return { ok: true };
+    }
+
+    set({ profile: mapProfile(combinedData) });
     return { ok: true };
   },
 }));

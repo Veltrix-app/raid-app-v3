@@ -40,6 +40,16 @@ type RewardVerificationRow = {
   cost: number;
 };
 
+type CampaignLookupRow = {
+  id: string;
+  title: string;
+};
+
+type ProjectLookupRow = {
+  id: string;
+  name: string;
+};
+
 function evaluateSubmission(params: {
   quest: VerificationQuestRow;
   proofText: string;
@@ -284,19 +294,76 @@ export function useActionSync() {
       const rewardsById = new Map(
         ((rewardRows ?? []) as RewardVerificationRow[]).map((row) => [row.id, row])
       );
+      const campaignIds = Array.from(
+        new Set(
+          ((rewardRows ?? []) as RewardVerificationRow[])
+            .map((row) => row.campaign_id)
+            .filter((value): value is string => !!value)
+        )
+      );
+      const projectIds = Array.from(
+        new Set(
+          ((rewardRows ?? []) as RewardVerificationRow[])
+            .map((row) => row.project_id)
+            .filter((value): value is string => !!value)
+        )
+      );
+
+      const [{ data: campaignRows }, { data: projectRows }] = await Promise.all([
+        campaignIds.length
+          ? supabase.from("campaigns").select("id, title").in("id", campaignIds)
+          : Promise.resolve({ data: [] as CampaignLookupRow[], error: null }),
+        projectIds.length
+          ? supabase.from("projects").select("id, name").in("id", projectIds)
+          : Promise.resolve({ data: [] as ProjectLookupRow[], error: null }),
+      ]);
+
+      const campaignsById = new Map(
+        ((campaignRows ?? []) as CampaignLookupRow[]).map((row) => [row.id, row])
+      );
+      const projectsById = new Map(
+        ((projectRows ?? []) as ProjectLookupRow[]).map((row) => [row.id, row])
+      );
+      const profileUsername = profile?.username ?? "Raider";
 
       for (const rewardId of claimedRewards) {
         if (syncedRewardsRef.current.has(rewardId)) continue;
 
         const reward = rewardsById.get(rewardId);
-        const { data: insertedClaim, error } = await supabase
+        const campaignTitle =
+          reward?.campaign_id ? campaignsById.get(reward.campaign_id)?.title ?? "" : "";
+        const projectTitle =
+          reward?.project_id ? projectsById.get(reward.project_id)?.name ?? "" : "";
+
+        let insertResult = await supabase
           .from("reward_claims")
           .insert({
-          auth_user_id: currentAuthUserId,
-          reward_id: rewardId,
+            auth_user_id: currentAuthUserId,
+            username: profileUsername,
+            reward_id: rewardId,
+            reward_title: reward?.title ?? "",
+            project_id: reward?.project_id ?? null,
+            project_name: projectTitle,
+            campaign_id: reward?.campaign_id ?? null,
+            campaign_title: campaignTitle,
+            claim_method: reward?.claim_method ?? "manual_fulfillment",
+            status: "pending",
           })
           .select("id")
           .single();
+
+        if (insertResult.error) {
+          insertResult = await supabase
+            .from("reward_claims")
+            .insert({
+              auth_user_id: currentAuthUserId,
+              reward_id: rewardId,
+            })
+            .select("id")
+            .single();
+        }
+
+        const { data: insertedClaim, error } = insertResult;
 
         if (!error) {
           syncedRewardsRef.current.add(rewardId);

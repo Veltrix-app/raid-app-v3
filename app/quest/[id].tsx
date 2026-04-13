@@ -10,7 +10,12 @@ import LiveScreenState from "@/components/LiveScreenState";
 
 import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
+import { useAuth } from "@/hooks/useAuth";
 import { useLiveAppData } from "@/hooks/useLiveAppData";
+
+const PORTAL_BASE_URL =
+  process.env.EXPO_PUBLIC_PORTAL_BASE_URL ||
+  "https://crypto-raid-admin-portal-bu2lofn3c-veltrix-apps-projects.vercel.app";
 
 function getStatusLabel(status: string) {
   if (status === "approved") return "Approved";
@@ -73,6 +78,7 @@ function getProofGuidance(params: {
 
 export default function QuestDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { session } = useAuth();
   const {
     submitQuest,
     approveQuestPrototype,
@@ -85,6 +91,7 @@ export default function QuestDetailScreen() {
   const existingProof = questProofs[id || ""] || "";
   const [proof, setProof] = useState(existingProof);
   const [showXP, setShowXP] = useState(false);
+  const [openingTrackedTask, setOpeningTrackedTask] = useState(false);
 
   const quest = useMemo(
     () => quests.find((item) => item.id === (id || "")),
@@ -125,6 +132,58 @@ export default function QuestDetailScreen() {
     if (!currentQuest.actionUrl) {
       Alert.alert("No destination yet", "This quest does not have a live destination configured.");
       return;
+    }
+
+    if (usesWebsiteVerification) {
+      if (!session?.access_token) {
+        Alert.alert("Sign in required", "Please sign in again before verifying this website quest.");
+        return;
+      }
+
+      setOpeningTrackedTask(true);
+
+      try {
+        const response = await fetch(`${PORTAL_BASE_URL}/api/verify/visit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            questId: currentQuest.id,
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok || typeof payload?.targetUrl !== "string") {
+          Alert.alert(
+            "Verification failed",
+            payload?.error || "Veltrix could not verify this website visit yet."
+          );
+          return;
+        }
+
+        approveQuestPrototype(currentQuest.id);
+        setShowXP(true);
+
+        const supportedTrackedTarget = await Linking.canOpenURL(payload.targetUrl);
+        if (!supportedTrackedTarget) {
+          Alert.alert("Cannot open link", "The verified destination could not be opened on your device.");
+          return;
+        }
+
+        await Linking.openURL(payload.targetUrl);
+        return;
+      } catch (error) {
+        Alert.alert(
+          "Verification failed",
+          error instanceof Error ? error.message : "Veltrix could not verify this website visit."
+        );
+        return;
+      } finally {
+        setOpeningTrackedTask(false);
+      }
     }
 
     const supported = await Linking.canOpenURL(currentQuest.actionUrl);
@@ -233,9 +292,15 @@ export default function QuestDetailScreen() {
         </View>
 
         <PrimaryButton
-          title={currentQuest.actionUrl ? currentQuest.actionLabel || "Open Task" : "No Destination Yet"}
+          title={
+            openingTrackedTask
+              ? "Verifying Visit..."
+              : currentQuest.actionUrl
+              ? currentQuest.actionLabel || "Open Task"
+              : "No Destination Yet"
+          }
           onPress={handleOpenTask}
-          disabled={!currentQuest.actionUrl}
+          disabled={!currentQuest.actionUrl || openingTrackedTask}
         />
 
         {!usesWebsiteVerification ? (

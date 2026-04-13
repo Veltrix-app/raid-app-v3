@@ -14,6 +14,8 @@ type VerificationQuestRow = {
   proof_type: string | null;
   auto_approve: boolean | null;
   verification_type: string | null;
+  verification_provider?: string | null;
+  completion_mode?: string | null;
   verification_config: Record<string, unknown> | null;
 };
 
@@ -323,6 +325,8 @@ function evaluateSubmission(params: {
   const verificationType = quest.verification_type ?? "manual_review";
   const questType = quest.quest_type ?? "custom";
   const autoApprove = quest.auto_approve ?? false;
+  const verificationProvider = quest.verification_provider ?? "custom";
+  const completionMode = quest.completion_mode ?? (autoApprove ? "rule_auto" : "manual");
   const config = quest.verification_config ?? {};
   const requiredConfigKeys = getRequiredConfigKeys(quest);
   const missingConfigKeys = getMissingConfigKeys(quest);
@@ -412,6 +416,25 @@ function evaluateSubmission(params: {
       metadata: {
         verificationType,
         questType,
+      },
+    } satisfies VerificationDecision;
+  }
+
+  if (
+    questType === "url_visit" &&
+    verificationProvider === "website" &&
+    completionMode === "integration_auto"
+  ) {
+    return {
+      status: "pending",
+      reason: "Quest is waiting for a tracked website verification event before approval.",
+      metadata: {
+        verificationType,
+        verificationProvider,
+        completionMode,
+        questType,
+        requiredConfigKeys,
+        automationRoute: "integration_wait",
       },
     } satisfies VerificationDecision;
   }
@@ -795,7 +818,7 @@ export function useActionSync() {
           supabase
             .from("quests")
             .select(
-              "id, project_id, title, quest_type, proof_required, proof_type, auto_approve, verification_type, verification_config"
+              "id, project_id, title, quest_type, proof_required, proof_type, auto_approve, verification_type, verification_provider, completion_mode, verification_config"
             )
             .in("id", pendingQuestIds),
           supabase
@@ -935,6 +958,9 @@ export function useActionSync() {
                   ? `${quest.title} met the live verification rules and was approved automatically.`
                   : finalDecision.status === "rejected"
                     ? `${quest.title} was rejected because the proof or validation rules did not pass.`
+                    : quest.verification_provider === "website" &&
+                      quest.completion_mode === "integration_auto"
+                    ? `${quest.title} is waiting for a tracked website verification signal before it can complete.`
                     : `${quest.title} was submitted and is now waiting for review.`,
               type: "quest",
               sourceTable: "quest_submissions",

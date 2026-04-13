@@ -23,9 +23,26 @@ function getProofGuidance(params: {
   proofRequired?: boolean;
   proofType?: string;
   verificationType?: string;
+  verificationProvider?: string;
+  completionMode?: string;
   questType?: string;
 }) {
-  const { proofRequired, proofType, verificationType, questType } = params;
+  const {
+    proofRequired,
+    proofType,
+    verificationType,
+    verificationProvider,
+    completionMode,
+    questType,
+  } = params;
+
+  if (
+    questType === "url_visit" &&
+    verificationProvider === "website" &&
+    completionMode === "integration_auto"
+  ) {
+    return "Open the tracked destination and Veltrix will complete this quest automatically after the website visit is confirmed.";
+  }
 
   if (!proofRequired || proofType === "none") {
     return "No proof upload is required here. Complete the action and submit when you are done.";
@@ -95,8 +112,14 @@ export default function QuestDetailScreen() {
     proofRequired: currentQuest.proofRequired,
     proofType: currentQuest.proofType,
     verificationType: currentQuest.verificationType,
+    verificationProvider: currentQuest.verificationProvider,
+    completionMode: currentQuest.completionMode,
     questType: currentQuest.questType,
   });
+  const usesWebsiteVerification =
+    currentQuest.questType === "url_visit" &&
+    currentQuest.verificationProvider === "website" &&
+    currentQuest.completionMode === "integration_auto";
 
   async function handleOpenTask() {
     if (!currentQuest.actionUrl) {
@@ -114,6 +137,14 @@ export default function QuestDetailScreen() {
   }
 
   function handleSubmit() {
+    if (usesWebsiteVerification) {
+      Alert.alert(
+        "Automatic verification",
+        "This quest completes automatically after Veltrix confirms your website visit."
+      );
+      return;
+    }
+
     if (liveStatus === "approved") {
       Alert.alert("Already approved", "This quest is already approved.");
       return;
@@ -172,7 +203,11 @@ export default function QuestDetailScreen() {
 
         <SectionTitle
           title="Execution"
-          subtitle="Understand the task, open the destination and then submit clean proof"
+          subtitle={
+            usesWebsiteVerification
+              ? "Open the tracked destination and let Veltrix confirm the visit automatically"
+              : "Understand the task, open the destination and then submit clean proof"
+          }
         />
         <View style={styles.statusCard}>
           <Text style={styles.statusLabel}>{getStatusLabel(liveStatus)}</Text>
@@ -182,6 +217,11 @@ export default function QuestDetailScreen() {
           <Text style={styles.statusSub}>
             Verification: {currentQuest.verificationType?.replace(/_/g, " ") || "manual review"}
           </Text>
+          {currentQuest.verificationProvider ? (
+            <Text style={styles.statusSub}>
+              Provider: {currentQuest.verificationProvider.replace(/_/g, " ")}
+            </Text>
+          ) : null}
           <Text style={styles.statusSub}>{proofGuidance}</Text>
           {currentQuest.proofType === "wallet" || currentQuest.proofType === "tx_hash" ? (
             <Text style={styles.walletHint}>
@@ -198,26 +238,37 @@ export default function QuestDetailScreen() {
           disabled={!currentQuest.actionUrl}
         />
 
-        <SectionTitle
-          title="Proof / Notes"
-          subtitle="Paste the clearest proof you can so review stays fast"
-        />
-        <View style={styles.proofCard}>
-          <TextInput
-            value={proof}
-            onChangeText={setProof}
-            multiline
-            style={styles.input}
-            placeholder="Paste proof here..."
-            placeholderTextColor={COLORS.subtext}
-          />
-        </View>
+        {!usesWebsiteVerification ? (
+          <>
+            <SectionTitle
+              title="Proof / Notes"
+              subtitle="Paste the clearest proof you can so review stays fast"
+            />
+            <View style={styles.proofCard}>
+              <TextInput
+                value={proof}
+                onChangeText={setProof}
+                multiline
+                style={styles.input}
+                placeholder="Paste proof here..."
+                placeholderTextColor={COLORS.subtext}
+              />
+            </View>
 
-        <PrimaryButton
-          title={liveStatus === "approved" ? "Quest Approved" : "Submit Quest"}
-          onPress={handleSubmit}
-          disabled={liveStatus === "approved"}
-        />
+            <PrimaryButton
+              title={liveStatus === "approved" ? "Quest Approved" : "Submit Quest"}
+              onPress={handleSubmit}
+              disabled={liveStatus === "approved"}
+            />
+          </>
+        ) : (
+          <View style={styles.autoVerificationCard}>
+            <Text style={styles.autoVerificationLabel}>Automatic website verification</Text>
+            <Text style={styles.autoVerificationCopy}>
+              Open the destination above. Once the tracked website signal lands, this quest can move forward without manual proof.
+            </Text>
+          </View>
+        )}
 
         {linkedCampaign ? (
           <>
@@ -354,6 +405,26 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  autoVerificationCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: 8,
+  },
+  autoVerificationLabel: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  autoVerificationCopy: {
+    color: COLORS.subtext,
+    fontSize: 13,
+    lineHeight: 20,
   },
   input: {
     minHeight: 120,

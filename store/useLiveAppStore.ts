@@ -101,6 +101,8 @@ export type LiveQuest = {
   proofRequired?: boolean;
   proofType?: string;
   verificationType?: string;
+  verificationProvider?: string;
+  completionMode?: string;
 };
 
 export type LiveBadge = {
@@ -355,6 +357,10 @@ export const useLiveAppStore = create<LiveAppState>((set) => ({
         proofRequired: row.proof_required ?? false,
         proofType: row.proof_type ?? "none",
         verificationType: row.verification_type ?? "manual_review",
+        verificationProvider: row.verification_provider ?? "custom",
+        completionMode:
+          row.completion_mode ??
+          ((row.auto_approve ?? false) ? "rule_auto" : "manual"),
       }));
 
       set({ quests });

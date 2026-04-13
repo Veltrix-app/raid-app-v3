@@ -23,6 +23,7 @@ export type Quest = {
   title: string;
   description: string;
   type: string;
+  questType?: string;
   xp: number;
   status: QuestStatus;
   actionLabel?: string;
@@ -30,6 +31,8 @@ export type Quest = {
   proofRequired?: boolean;
   proofType?: string;
   verificationType?: string;
+  verificationProvider?: string;
+  completionMode?: string;
 };
 
 export type Campaign = {

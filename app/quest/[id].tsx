@@ -42,6 +42,14 @@ function getProofGuidance(params: {
   } = params;
 
   if (
+    questType === "discord_join" &&
+    verificationProvider === "discord" &&
+    completionMode === "integration_auto"
+  ) {
+    return "Link your Discord account, join the server and let Veltrix wait for membership confirmation instead of asking for manual proof.";
+  }
+
+  if (
     questType === "url_visit" &&
     verificationProvider === "website" &&
     completionMode === "integration_auto"
@@ -127,6 +135,10 @@ export default function QuestDetailScreen() {
     currentQuest.questType === "url_visit" &&
     currentQuest.verificationProvider === "website" &&
     currentQuest.completionMode === "integration_auto";
+  const usesDiscordVerification =
+    currentQuest.questType === "discord_join" &&
+    currentQuest.verificationProvider === "discord" &&
+    currentQuest.completionMode === "integration_auto";
 
   async function handleOpenTask() {
     if (!currentQuest.actionUrl) {
@@ -179,6 +191,62 @@ export default function QuestDetailScreen() {
         Alert.alert(
           "Verification failed",
           error instanceof Error ? error.message : "Veltrix could not verify this website visit."
+        );
+        return;
+      } finally {
+        setOpeningTrackedTask(false);
+      }
+    }
+
+    if (usesDiscordVerification) {
+      if (!session?.access_token) {
+        Alert.alert("Sign in required", "Please sign in again before verifying this Discord quest.");
+        return;
+      }
+
+      setOpeningTrackedTask(true);
+
+      try {
+        const response = await fetch(`${PORTAL_BASE_URL}/api/verify/discord`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            questId: currentQuest.id,
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok || typeof payload?.targetUrl !== "string") {
+          Alert.alert(
+            "Discord verification blocked",
+            payload?.error || "Veltrix could not start Discord membership verification yet."
+          );
+          return;
+        }
+
+        submitQuest(currentQuest.id, "discord_membership_requested");
+
+        const supportedDiscordTarget = await Linking.canOpenURL(payload.targetUrl);
+        if (!supportedDiscordTarget) {
+          Alert.alert("Cannot open link", "The Discord invite could not be opened on your device.");
+          return;
+        }
+
+        await Linking.openURL(payload.targetUrl);
+        Alert.alert(
+          "Discord verification started",
+          payload?.message ||
+            "Join the server now. Veltrix has queued the membership verification request."
+        );
+        return;
+      } catch (error) {
+        Alert.alert(
+          "Discord verification failed",
+          error instanceof Error ? error.message : "Veltrix could not start Discord verification."
         );
         return;
       } finally {
@@ -265,6 +333,8 @@ export default function QuestDetailScreen() {
           subtitle={
             usesWebsiteVerification
               ? "Open the tracked destination and let Veltrix confirm the visit automatically"
+              : usesDiscordVerification
+              ? "Join the Discord server and let Veltrix hold the quest until membership is confirmed"
               : "Understand the task, open the destination and then submit clean proof"
           }
         />
@@ -303,7 +373,7 @@ export default function QuestDetailScreen() {
           disabled={!currentQuest.actionUrl || openingTrackedTask}
         />
 
-        {!usesWebsiteVerification ? (
+        {!usesWebsiteVerification && !usesDiscordVerification ? (
           <>
             <SectionTitle
               title="Proof / Notes"
@@ -328,9 +398,15 @@ export default function QuestDetailScreen() {
           </>
         ) : (
           <View style={styles.autoVerificationCard}>
-            <Text style={styles.autoVerificationLabel}>Automatic website verification</Text>
+            <Text style={styles.autoVerificationLabel}>
+              {usesWebsiteVerification
+                ? "Automatic website verification"
+                : "Automatic Discord verification"}
+            </Text>
             <Text style={styles.autoVerificationCopy}>
-              Open the destination above. Once the tracked website signal lands, this quest can move forward without manual proof.
+              {usesWebsiteVerification
+                ? "Open the destination above. Once the tracked website signal lands, this quest can move forward without manual proof."
+                : "Open the Discord invite above. Veltrix will keep the quest in verification while the Discord membership check is pending."}
             </Text>
           </View>
         )}

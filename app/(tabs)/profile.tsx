@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 
@@ -13,6 +13,7 @@ import { COLORS, RADIUS, SPACING } from "@/constants/theme";
 import { useAppState } from "@/hooks/useAppState";
 import { useAuth } from "@/hooks/useAuth";
 import { useLiveAppData } from "@/hooks/useLiveAppData";
+import { supabase } from "@/lib/supabase";
 
 export default function ProfileScreen() {
   const {
@@ -29,7 +30,7 @@ export default function ProfileScreen() {
     resetProgress,
   } = useAppState();
 
-  const { profile, signOut, loading: authLoading } = useAuth();
+  const { profile, authUserId, signOut, loading: authLoading } = useAuth();
   const {
     badges,
     unlockedBadgeIds,
@@ -59,6 +60,40 @@ export default function ProfileScreen() {
     [canonicalQuestStatuses]
   );
   const recentActivity = useMemo(() => notificationsFeed.slice(0, 3), [notificationsFeed]);
+  const [discordConnected, setDiscordConnected] = useState(false);
+  const [discordUsername, setDiscordUsername] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadConnectedAccounts() {
+      if (!authUserId) {
+        if (!cancelled) {
+          setDiscordConnected(false);
+          setDiscordUsername("");
+        }
+        return;
+      }
+
+      const { data } = await supabase
+        .from("user_connected_accounts")
+        .select("username, status")
+        .eq("auth_user_id", authUserId)
+        .eq("provider", "discord")
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      setDiscordConnected(data?.status === "connected");
+      setDiscordUsername(data?.username ?? "");
+    }
+
+    loadConnectedAccounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUserId]);
 
   const username = profile?.username || "Raider";
   const avatar =
@@ -143,6 +178,36 @@ export default function ProfileScreen() {
           <StatCard label="Trust score" value={trustScore} />
           <StatCard label="Sybil risk" value={sybilScore} />
         </View>
+      </View>
+
+      <View style={styles.integrationCard}>
+        <View style={styles.integrationHeader}>
+          <View>
+            <Text style={styles.integrationEyebrow}>Connected identities</Text>
+            <Text style={styles.integrationTitle}>Discord readiness</Text>
+          </View>
+          <View
+            style={[
+              styles.integrationPill,
+              discordConnected ? styles.integrationPillReady : styles.integrationPillMuted,
+            ]}
+          >
+            <Text
+              style={[
+                styles.integrationPillText,
+                discordConnected ? styles.integrationPillTextReady : styles.integrationPillTextMuted,
+              ]}
+            >
+              {discordConnected ? "Linked" : "Not linked"}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.integrationBody}>
+          {discordConnected
+            ? `Veltrix can use ${discordUsername || "your Discord account"} when Discord quests start membership verification.`
+            : "Linking Discord is the next step needed for real join-server quest verification."}
+        </Text>
       </View>
 
       <View style={styles.row}>
@@ -327,6 +392,55 @@ const styles = StyleSheet.create({
   },
   reputationTitle: { color: COLORS.text, fontSize: 24, fontWeight: "800", marginTop: 6 },
   reputationText: { color: COLORS.subtext, fontSize: 13, lineHeight: 20 },
+  integrationCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    gap: 12,
+  },
+  integrationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
+  integrationEyebrow: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  integrationTitle: { color: COLORS.text, fontSize: 20, fontWeight: "800", marginTop: 6 },
+  integrationBody: { color: COLORS.subtext, fontSize: 13, lineHeight: 20 },
+  integrationPill: {
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+  },
+  integrationPillReady: {
+    backgroundColor: COLORS.primary + "22",
+    borderColor: COLORS.borderStrong,
+  },
+  integrationPillMuted: {
+    backgroundColor: COLORS.card2,
+    borderColor: COLORS.border,
+  },
+  integrationPillText: {
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  integrationPillTextReady: {
+    color: COLORS.primary,
+  },
+  integrationPillTextMuted: {
+    color: COLORS.subtext,
+  },
   rankPill: {
     borderRadius: RADIUS.md,
     borderWidth: 1,

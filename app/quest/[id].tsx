@@ -42,6 +42,14 @@ function getProofGuidance(params: {
   } = params;
 
   if (
+    questType === "telegram_join" &&
+    verificationProvider === "telegram" &&
+    completionMode === "integration_auto"
+  ) {
+    return "Link your Telegram account, join the group and let Veltrix wait for membership confirmation instead of asking for manual proof.";
+  }
+
+  if (
     questType === "discord_join" &&
     verificationProvider === "discord" &&
     completionMode === "integration_auto"
@@ -138,6 +146,10 @@ export default function QuestDetailScreen() {
   const usesDiscordVerification =
     currentQuest.questType === "discord_join" &&
     currentQuest.verificationProvider === "discord" &&
+    currentQuest.completionMode === "integration_auto";
+  const usesTelegramVerification =
+    currentQuest.questType === "telegram_join" &&
+    currentQuest.verificationProvider === "telegram" &&
     currentQuest.completionMode === "integration_auto";
 
   async function handleOpenTask() {
@@ -254,6 +266,62 @@ export default function QuestDetailScreen() {
       }
     }
 
+    if (usesTelegramVerification) {
+      if (!session?.access_token) {
+        Alert.alert("Sign in required", "Please sign in again before verifying this Telegram quest.");
+        return;
+      }
+
+      setOpeningTrackedTask(true);
+
+      try {
+        const response = await fetch(`${PORTAL_BASE_URL}/api/verify/telegram`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            questId: currentQuest.id,
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok || typeof payload?.targetUrl !== "string") {
+          Alert.alert(
+            "Telegram verification blocked",
+            payload?.error || "Veltrix could not start Telegram membership verification yet."
+          );
+          return;
+        }
+
+        submitQuest(currentQuest.id, "telegram_membership_requested");
+
+        const supportedTelegramTarget = await Linking.canOpenURL(payload.targetUrl);
+        if (!supportedTelegramTarget) {
+          Alert.alert("Cannot open link", "The Telegram group link could not be opened on your device.");
+          return;
+        }
+
+        await Linking.openURL(payload.targetUrl);
+        Alert.alert(
+          "Telegram verification started",
+          payload?.message ||
+            "Join the Telegram group now. Veltrix has queued the membership verification request."
+        );
+        return;
+      } catch (error) {
+        Alert.alert(
+          "Telegram verification failed",
+          error instanceof Error ? error.message : "Veltrix could not start Telegram verification."
+        );
+        return;
+      } finally {
+        setOpeningTrackedTask(false);
+      }
+    }
+
     const supported = await Linking.canOpenURL(currentQuest.actionUrl);
     if (!supported) {
       Alert.alert("Cannot open link", "This destination could not be opened on your device.");
@@ -335,6 +403,8 @@ export default function QuestDetailScreen() {
               ? "Open the tracked destination and let Veltrix confirm the visit automatically"
               : usesDiscordVerification
               ? "Join the Discord server and let Veltrix hold the quest until membership is confirmed"
+              : usesTelegramVerification
+              ? "Join the Telegram group and let Veltrix hold the quest until membership is confirmed"
               : "Understand the task, open the destination and then submit clean proof"
           }
         />
@@ -373,7 +443,7 @@ export default function QuestDetailScreen() {
           disabled={!currentQuest.actionUrl || openingTrackedTask}
         />
 
-        {!usesWebsiteVerification && !usesDiscordVerification ? (
+        {!usesWebsiteVerification && !usesDiscordVerification && !usesTelegramVerification ? (
           <>
             <SectionTitle
               title="Proof / Notes"
@@ -401,12 +471,16 @@ export default function QuestDetailScreen() {
             <Text style={styles.autoVerificationLabel}>
               {usesWebsiteVerification
                 ? "Automatic website verification"
-                : "Automatic Discord verification"}
+                : usesDiscordVerification
+                ? "Automatic Discord verification"
+                : "Automatic Telegram verification"}
             </Text>
             <Text style={styles.autoVerificationCopy}>
               {usesWebsiteVerification
                 ? "Open the destination above. Once the tracked website signal lands, this quest can move forward without manual proof."
-                : "Open the Discord invite above. Veltrix will keep the quest in verification while the Discord membership check is pending."}
+                : usesDiscordVerification
+                ? "Open the Discord invite above. Veltrix will keep the quest in verification while the Discord membership check is pending."
+                : "Open the Telegram group above. Veltrix will keep the quest in verification while the Telegram membership check is pending."}
             </Text>
           </View>
         )}

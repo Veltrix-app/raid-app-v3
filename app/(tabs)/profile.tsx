@@ -62,6 +62,8 @@ export default function ProfileScreen() {
   const recentActivity = useMemo(() => notificationsFeed.slice(0, 3), [notificationsFeed]);
   const [discordConnected, setDiscordConnected] = useState(false);
   const [discordUsername, setDiscordUsername] = useState("");
+  const [telegramConnected, setTelegramConnected] = useState(false);
+  const [telegramUsername, setTelegramUsername] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -71,21 +73,33 @@ export default function ProfileScreen() {
         if (!cancelled) {
           setDiscordConnected(false);
           setDiscordUsername("");
+          setTelegramConnected(false);
+          setTelegramUsername("");
         }
         return;
       }
 
-      const { data } = await supabase
-        .from("user_connected_accounts")
-        .select("username, status")
-        .eq("auth_user_id", authUserId)
-        .eq("provider", "discord")
-        .maybeSingle();
+      const [{ data: discordData }, { data: telegramData }] = await Promise.all([
+        supabase
+          .from("user_connected_accounts")
+          .select("username, status")
+          .eq("auth_user_id", authUserId)
+          .eq("provider", "discord")
+          .maybeSingle(),
+        supabase
+          .from("user_connected_accounts")
+          .select("username, status")
+          .eq("auth_user_id", authUserId)
+          .eq("provider", "telegram")
+          .maybeSingle(),
+      ]);
 
       if (cancelled) return;
 
-      setDiscordConnected(data?.status === "connected");
-      setDiscordUsername(data?.username ?? "");
+      setDiscordConnected(discordData?.status === "connected");
+      setDiscordUsername(discordData?.username ?? "");
+      setTelegramConnected(telegramData?.status === "connected");
+      setTelegramUsername(telegramData?.username ?? "");
     }
 
     loadConnectedAccounts();
@@ -184,29 +198,51 @@ export default function ProfileScreen() {
         <View style={styles.integrationHeader}>
           <View>
             <Text style={styles.integrationEyebrow}>Connected identities</Text>
-            <Text style={styles.integrationTitle}>Discord readiness</Text>
+            <Text style={styles.integrationTitle}>Community verification readiness</Text>
           </View>
-          <View
-            style={[
-              styles.integrationPill,
-              discordConnected ? styles.integrationPillReady : styles.integrationPillMuted,
-            ]}
-          >
-            <Text
+          <View style={styles.integrationPillStack}>
+            <View
               style={[
-                styles.integrationPillText,
-                discordConnected ? styles.integrationPillTextReady : styles.integrationPillTextMuted,
+                styles.integrationPill,
+                discordConnected ? styles.integrationPillReady : styles.integrationPillMuted,
               ]}
             >
-              {discordConnected ? "Linked" : "Not linked"}
-            </Text>
+              <Text
+                style={[
+                  styles.integrationPillText,
+                  discordConnected ? styles.integrationPillTextReady : styles.integrationPillTextMuted,
+                ]}
+              >
+                Discord {discordConnected ? "linked" : "not linked"}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.integrationPill,
+                telegramConnected ? styles.integrationPillReady : styles.integrationPillMuted,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.integrationPillText,
+                  telegramConnected ? styles.integrationPillTextReady : styles.integrationPillTextMuted,
+                ]}
+              >
+                Telegram {telegramConnected ? "linked" : "not linked"}
+              </Text>
+            </View>
           </View>
         </View>
 
         <Text style={styles.integrationBody}>
-          {discordConnected
-            ? `Veltrix can use ${discordUsername || "your Discord account"} when Discord quests start membership verification.`
-            : "Linking Discord is the next step needed for real join-server quest verification."}
+          {[
+            discordConnected
+              ? `Discord ready as ${discordUsername || "your linked account"}.`
+              : "Linking Discord is still needed for real join-server quest verification.",
+            telegramConnected
+              ? `Telegram ready as ${telegramUsername || "your linked account"}.`
+              : "Linking Telegram is still needed for real join-group quest verification.",
+          ].join(" ")}
         </Text>
       </View>
 
@@ -415,6 +451,10 @@ const styles = StyleSheet.create({
   },
   integrationTitle: { color: COLORS.text, fontSize: 20, fontWeight: "800", marginTop: 6 },
   integrationBody: { color: COLORS.subtext, fontSize: 13, lineHeight: 20 },
+  integrationPillStack: {
+    alignItems: "flex-end",
+    gap: SPACING.sm,
+  },
   integrationPill: {
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,

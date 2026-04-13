@@ -421,6 +421,25 @@ function evaluateSubmission(params: {
   }
 
   if (
+    questType === "telegram_join" &&
+    verificationProvider === "telegram" &&
+    completionMode === "integration_auto"
+  ) {
+    return {
+      status: "pending",
+      reason: "Quest is waiting for Telegram membership confirmation before approval.",
+      metadata: {
+        verificationType,
+        verificationProvider,
+        completionMode,
+        questType,
+        requiredConfigKeys,
+        automationRoute: "integration_wait",
+      },
+    } satisfies VerificationDecision;
+  }
+
+  if (
     questType === "discord_join" &&
     verificationProvider === "discord" &&
     completionMode === "integration_auto"

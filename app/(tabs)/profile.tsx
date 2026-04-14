@@ -64,6 +64,8 @@ export default function ProfileScreen() {
   const [discordUsername, setDiscordUsername] = useState("");
   const [telegramConnected, setTelegramConnected] = useState(false);
   const [telegramUsername, setTelegramUsername] = useState("");
+  const [xConnected, setXConnected] = useState(false);
+  const [xUsername, setXUsername] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,11 +77,13 @@ export default function ProfileScreen() {
           setDiscordUsername("");
           setTelegramConnected(false);
           setTelegramUsername("");
+          setXConnected(false);
+          setXUsername("");
         }
         return;
       }
 
-      const [{ data: discordData }, { data: telegramData }] = await Promise.all([
+      const [{ data: discordData }, { data: telegramData }, { data: xData }] = await Promise.all([
         supabase
           .from("user_connected_accounts")
           .select("username, status")
@@ -92,6 +96,12 @@ export default function ProfileScreen() {
           .eq("auth_user_id", authUserId)
           .eq("provider", "telegram")
           .maybeSingle(),
+        supabase
+          .from("user_connected_accounts")
+          .select("username, status")
+          .eq("auth_user_id", authUserId)
+          .eq("provider", "x")
+          .maybeSingle(),
       ]);
 
       if (cancelled) return;
@@ -100,6 +110,8 @@ export default function ProfileScreen() {
       setDiscordUsername(discordData?.username ?? "");
       setTelegramConnected(telegramData?.status === "connected");
       setTelegramUsername(telegramData?.username ?? "");
+      setXConnected(xData?.status === "connected");
+      setXUsername(xData?.username ?? "");
     }
 
     loadConnectedAccounts();
@@ -204,6 +216,21 @@ export default function ProfileScreen() {
             <View
               style={[
                 styles.integrationPill,
+                xConnected ? styles.integrationPillReady : styles.integrationPillMuted,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.integrationPillText,
+                  xConnected ? styles.integrationPillTextReady : styles.integrationPillTextMuted,
+                ]}
+              >
+                X {xConnected ? "linked" : "not linked"}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.integrationPill,
                 discordConnected ? styles.integrationPillReady : styles.integrationPillMuted,
               ]}
             >
@@ -236,6 +263,9 @@ export default function ProfileScreen() {
 
         <Text style={styles.integrationBody}>
           {[
+            xConnected
+              ? `X ready as ${xUsername || "your linked account"}.`
+              : "Linking X is still needed for real follow-quest verification.",
             discordConnected
               ? `Discord ready as ${discordUsername || "your linked account"}.`
               : "Linking Discord is still needed for real join-server quest verification.",

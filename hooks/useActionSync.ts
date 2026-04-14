@@ -421,6 +421,25 @@ function evaluateSubmission(params: {
   }
 
   if (
+    questType === "social_follow" &&
+    verificationProvider === "x" &&
+    completionMode === "integration_auto"
+  ) {
+    return {
+      status: "pending",
+      reason: "Quest is waiting for X follow confirmation before approval.",
+      metadata: {
+        verificationType,
+        verificationProvider,
+        completionMode,
+        questType,
+        requiredConfigKeys,
+        automationRoute: "integration_wait",
+      },
+    } satisfies VerificationDecision;
+  }
+
+  if (
     questType === "telegram_join" &&
     verificationProvider === "telegram" &&
     completionMode === "integration_auto"

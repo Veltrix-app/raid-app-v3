@@ -42,6 +42,14 @@ function getProofGuidance(params: {
   } = params;
 
   if (
+    questType === "social_follow" &&
+    verificationProvider === "x" &&
+    completionMode === "integration_auto"
+  ) {
+    return "Link your X account, follow the project profile and let Veltrix wait for follow confirmation instead of asking for manual proof.";
+  }
+
+  if (
     questType === "telegram_join" &&
     verificationProvider === "telegram" &&
     completionMode === "integration_auto"
@@ -150,6 +158,10 @@ export default function QuestDetailScreen() {
   const usesTelegramVerification =
     currentQuest.questType === "telegram_join" &&
     currentQuest.verificationProvider === "telegram" &&
+    currentQuest.completionMode === "integration_auto";
+  const usesXVerification =
+    currentQuest.questType === "social_follow" &&
+    currentQuest.verificationProvider === "x" &&
     currentQuest.completionMode === "integration_auto";
 
   async function handleOpenTask() {
@@ -322,6 +334,62 @@ export default function QuestDetailScreen() {
       }
     }
 
+    if (usesXVerification) {
+      if (!session?.access_token) {
+        Alert.alert("Sign in required", "Please sign in again before verifying this X quest.");
+        return;
+      }
+
+      setOpeningTrackedTask(true);
+
+      try {
+        const response = await fetch(`${PORTAL_BASE_URL}/api/verify/x-follow`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            questId: currentQuest.id,
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload?.ok || typeof payload?.targetUrl !== "string") {
+          Alert.alert(
+            "X verification blocked",
+            payload?.error || "Veltrix could not start X follow verification yet."
+          );
+          return;
+        }
+
+        submitQuest(currentQuest.id, "x_follow_requested");
+
+        const supportedXTarget = await Linking.canOpenURL(payload.targetUrl);
+        if (!supportedXTarget) {
+          Alert.alert("Cannot open link", "The X profile could not be opened on your device.");
+          return;
+        }
+
+        await Linking.openURL(payload.targetUrl);
+        Alert.alert(
+          "X verification started",
+          payload?.message ||
+            "Follow the account now. Veltrix has queued the follow verification request."
+        );
+        return;
+      } catch (error) {
+        Alert.alert(
+          "X verification failed",
+          error instanceof Error ? error.message : "Veltrix could not start X verification."
+        );
+        return;
+      } finally {
+        setOpeningTrackedTask(false);
+      }
+    }
+
     const supported = await Linking.canOpenURL(currentQuest.actionUrl);
     if (!supported) {
       Alert.alert("Cannot open link", "This destination could not be opened on your device.");
@@ -405,6 +473,8 @@ export default function QuestDetailScreen() {
               ? "Join the Discord server and let Veltrix hold the quest until membership is confirmed"
               : usesTelegramVerification
               ? "Join the Telegram group and let Veltrix hold the quest until membership is confirmed"
+              : usesXVerification
+              ? "Follow the X account and let Veltrix hold the quest until the follow is confirmed"
               : "Understand the task, open the destination and then submit clean proof"
           }
         />
@@ -443,7 +513,10 @@ export default function QuestDetailScreen() {
           disabled={!currentQuest.actionUrl || openingTrackedTask}
         />
 
-        {!usesWebsiteVerification && !usesDiscordVerification && !usesTelegramVerification ? (
+        {!usesWebsiteVerification &&
+        !usesDiscordVerification &&
+        !usesTelegramVerification &&
+        !usesXVerification ? (
           <>
             <SectionTitle
               title="Proof / Notes"
@@ -473,14 +546,18 @@ export default function QuestDetailScreen() {
                 ? "Automatic website verification"
                 : usesDiscordVerification
                 ? "Automatic Discord verification"
-                : "Automatic Telegram verification"}
+                : usesTelegramVerification
+                ? "Automatic Telegram verification"
+                : "Automatic X verification"}
             </Text>
             <Text style={styles.autoVerificationCopy}>
               {usesWebsiteVerification
                 ? "Open the destination above. Once the tracked website signal lands, this quest can move forward without manual proof."
                 : usesDiscordVerification
                 ? "Open the Discord invite above. Veltrix will keep the quest in verification while the Discord membership check is pending."
-                : "Open the Telegram group above. Veltrix will keep the quest in verification while the Telegram membership check is pending."}
+                : usesTelegramVerification
+                ? "Open the Telegram group above. Veltrix will keep the quest in verification while the Telegram membership check is pending."
+                : "Open the X profile above. Veltrix will keep the quest in verification while the follow confirmation is pending."}
             </Text>
           </View>
         )}
